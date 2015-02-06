@@ -1,15 +1,22 @@
-﻿<Window x:Class="MyEdit.MainWindow"
+﻿<Window xmlns:WPF="clr-namespace:ConsoleControl.WPF;assembly=ConsoleControl.WPF"  x:Class="MyEdit.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="MainWindow" Height="350" Width="525">
-    <StackPanel>
+        Title="MainWindow" Height="350" Width="525" WindowStyle="ToolWindow">
+    <DockPanel>
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_File">
+                <MenuItem Header="_Open"/>
+                <MenuItem Header="_Close"/>
+                <MenuItem Header="_Save"/>
+            </MenuItem>
+        </Menu>
         <avalonEdit:TextEditor
             xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
             Name="textEditor"
             FontFamily="Consolas"
             SyntaxHighlighting="C#"
             FontSize="10pt" />
-    </StackPanel>
+    </DockPanel>
 
 
 </Window>

@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Reflection;
 using System.Windows.Input;
+using System.Diagnostics;
 
 namespace MyEdit
 {
@@ -29,6 +30,8 @@ namespace MyEdit
             _items.Add(string.Empty);
             _items.Add("Type a line and press ENTER, it will be added to the output...");
             _items.Add(string.Empty);
+
+
 
             _executeItemCommand = new RelayCommand<string>(AddItem, x => true);
         }
@@ -53,7 +56,29 @@ namespace MyEdit
 
         private void AddItem(string item)
         {
-            _items.Add(item);
+            var p = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = @"/c " + item,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = Encoding.ASCII
+
+                }
+            };
+
+            p.Start();
+
+            while (!p.StandardOutput.EndOfStream)
+            {
+                string line = p.StandardOutput.ReadLine();
+                _items.Add(line);
+                // do something with line
+            }
+            
         }
     }
 }

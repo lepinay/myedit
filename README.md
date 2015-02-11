@@ -18,6 +18,9 @@ Why am I writing my own code editor ?
 * I want to be able to trigger script on file change and set that up EASILY
 
 # History
+
+This is where we have a fun and see how the baby is growing :smiley:
+
 ## Version 1
 
 ### Design 

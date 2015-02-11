@@ -12,6 +12,12 @@ using System.Management.Automation.Runspaces;
 using PowerShell = System.Management.Automation.PowerShell;
 using System.Management.Automation.Host;
 using System.Globalization;
+using System.Windows;
+using System.Windows.Controls;
+using ICSharpCode.AvalonEdit;
+using System.Xml;
+using ICSharpCode.AvalonEdit.Highlighting;
+using ICSharpCode.AvalonEdit.Document;
 
 // https://github.com/icsharpcode/SharpDevelop/blob/master/src/AddIns/BackendBindings/FSharpBinding/Resources/FS-Mode.xshd
 // https://github.com/icsharpcode/SharpDevelop/tree/master/src/Libraries/AvalonEdit/ICSharpCode.AvalonEdit/Highlighting/Resources
@@ -19,9 +25,21 @@ using System.Globalization;
 namespace MyEdit
 {
 
+    public class PageModel
+    {
+        public string Title { get; set; }
+        public string TabCaption { get; set; }
+        public TextDocument Document { get; set; }
+        public FrameworkElement TabContent { get; set; }
+        public IHighlightingDefinition Syntax { get; set; }
+    }
+
 
     public sealed class ExampleViewModel : BaseViewModel
     {
+        /// <summary>
+        /// lots of this stuff shouldnt be in view model of course :D
+        /// </summary>
         private ICommand _executeItemCommand;
         private readonly ObservableCollection<string> _items;
         private Process process;
@@ -29,29 +47,14 @@ namespace MyEdit
         private Runspace myRunSpace;
         private PowerShell powershell;
         private App app;
+        private TextEditor editor;
+        private IHighlightingDefinition haskellSyntax;
 
 
         public ExampleViewModel(App app)
         {
-            // TODO: Complete member initialization
             this.app = app;
 
-
-
-
-            process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "cmd.exe",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardInput = true,
-                    CreateNoWindow = true,
-                }
-            };
-
-            process.Start();
             _items = new ObservableCollection<string>();
 
             var executingAssembly = Assembly.GetExecutingAssembly();
@@ -81,6 +84,14 @@ namespace MyEdit
 
 
             _executeItemCommand = new RelayCommand<string>(AddItem, x => true);
+
+            editor = new TextEditor();
+            using (XmlTextReader reader = new XmlTextReader(@"Syntax\FS-Mode.xshd"))
+            {
+                haskellSyntax = ICSharpCode.AvalonEdit.Highlighting.Xshd.HighlightingLoader.Load(reader, HighlightingManager.Instance);
+            }
+
+            this.PageModels = new ObservableCollection<PageModel>();
         }
 
         public IEnumerable<string> Items
@@ -103,12 +114,28 @@ namespace MyEdit
 
         private void AddItem(string item)
         {
-            Task.Run(() => {
+            Task.Run(() =>
+            {
                 powershell.AddScript(item);
                 powershell.AddCommand("out-default");
                 powershell.Invoke();
             });
-            
+
+        }
+
+        public ObservableCollection<PageModel> PageModels { get; set; }
+
+        internal void NewTab(string p)
+        {
+            var _doc = new ICSharpCode.AvalonEdit.Document.TextDocument(p);
+            editor.Document = _doc;
+            var page = new PageModel { Title = "page 1", TabContent = editor, TabCaption = "File 1", Document = _doc, Syntax = haskellSyntax };
+            this.PageModels.Add(page);
+        }
+
+        internal void SwitchContent(string doc)
+        {
+            NewTab(doc);
         }
     }
 }

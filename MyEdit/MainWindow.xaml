@@ -55,8 +55,59 @@
                         ResizeDirection="Columns"
                         ShowsPreview="True"  Width="5"  Cursor="SizeWE"   />
 
-            <TabControl Grid.Column="2">
-                <TabItem Header="File">
+            <TabControl Grid.Column="2" ItemsSource="{Binding PageModels, Mode=TwoWay}" SelectionChanged="TabControl_SelectionChanged">
+                <TabControl.ContentTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="5" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <avalonEdit:TextEditor
+                Grid.Column="0"
+                Grid.Row="0"
+            xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
+            Name="textEditor"
+            FontFamily="Consolas"
+            ShowLineNumbers="True"
+            Document="{Binding Document}"
+            SyntaxHighlighting="{Binding Syntax}"
+            FontSize="10pt" />
+                            <GridSplitter 
+                        Grid.ColumnSpan="1"
+                        Grid.Row="1" 
+                        VerticalAlignment="Center" 
+                        HorizontalAlignment="Stretch" 
+                        ResizeDirection="Rows"
+                        ShowsPreview="True"  Height="5"  Cursor="SizeNS"   />
+                            <t:Terminal Grid.Row="2" Grid.Column="0" x:Name="TerminalOutput"
+                    IsReadOnlyCaretVisible="False"
+                    VerticalScrollBarVisibility="Visible"
+                    IsReadOnly="false"
+                    Prompt=">"
+                    ItemsSource="{Binding Path=Items, Mode=OneWay}">
+
+                                <i:Interaction.Triggers>
+                                    <i:EventTrigger EventName="LineEntered">
+                                        <i:InvokeCommandAction Command="{Binding Path=ExecuteItemCommand, Mode=OneWay}"
+                                           CommandParameter="{Binding Path=Line, Mode=OneWay, ElementName=TerminalOutput}" />
+                                    </i:EventTrigger>
+                                </i:Interaction.Triggers>
+
+                            </t:Terminal>
+                        </Grid>
+                    </DataTemplate>
+                </TabControl.ContentTemplate>
+                <TabControl.ItemContainerStyle>
+                    <Style TargetType="TabItem">
+                        <Setter Property="Header" Value="{Binding TabCaption}"/>
+                    </Style>
+                </TabControl.ItemContainerStyle>
+                <!--<TabItem Header="File">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="*" />
@@ -97,16 +148,7 @@
 
                         </t:Terminal>
                     </Grid>
-                </TabItem>
-                <TabItem Header="File 2">File</TabItem>
-                <TabItem Header="Some other file">File</TabItem>
-                <TabItem Header="Some other file">File</TabItem>
-                <TabItem Header="Some other file">File</TabItem>
-                <TabItem Header="Some other file">File</TabItem>
-                <TabItem Header="Some other file">File</TabItem>
-                <TabItem Header="Some other file">File</TabItem>
-                <TabItem Header="Some other file">File</TabItem>
-                <TabItem Header="Some other file" Style="{StaticResource HeaderTextBlockStyle}">File</TabItem>
+                </TabItem>-->
             </TabControl>
         </Grid>
     </DockPanel>

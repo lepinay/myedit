@@ -1,4 +1,5 @@
-﻿using ICSharpCode.AvalonEdit.Highlighting;
+﻿using ICSharpCode.AvalonEdit;
+using ICSharpCode.AvalonEdit.Highlighting;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -19,6 +20,7 @@ using System.Xml;
 
 namespace MyEdit
 {
+
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
@@ -27,12 +29,7 @@ namespace MyEdit
         public MainWindow()
         {
             InitializeComponent();
-            using (XmlTextReader reader = new XmlTextReader(@"Syntax\FS-Mode.xshd"))
-            {
-
-                this.textEditor.SyntaxHighlighting = ICSharpCode.AvalonEdit.Highlighting.Xshd.HighlightingLoader.Load(reader, HighlightingManager.Instance);
-
-            }
+            
 
         }
 
@@ -45,7 +42,7 @@ namespace MyEdit
             if (result == true)
             {
                 string filename = dlg.FileName;
-                textEditor.Text = System.IO.File.ReadAllText(filename);
+                (DataContext as ExampleViewModel).NewTab(System.IO.File.ReadAllText(filename));
             }
         }
 
@@ -69,7 +66,7 @@ namespace MyEdit
         {
             trvMenu.Items.Clear();
             MenuItem root = new MenuItem() { Title = p };
-            foreach (var d in Directory.EnumerateDirectories(p).Union( Directory.EnumerateFiles(p))  )
+            foreach (var d in Directory.EnumerateDirectories(p).Union(Directory.EnumerateFiles(p)))
             {
                 var child = new MenuItem() { Title = d };
                 root.Items.Add(child);
@@ -95,8 +92,17 @@ namespace MyEdit
             {
                 var path = menu.Title;
                 if (Directory.Exists(path)) expandFolder(menu, path);
-                else textEditor.Text = System.IO.File.ReadAllText(path);
+                else
+                {
+                    var doc = System.IO.File.ReadAllText(path);
+                    (DataContext as ExampleViewModel).SwitchContent(doc);
+                }
             }
+        }
+
+        private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+
         }
     }
 

@@ -11,7 +11,7 @@ This is a proof of concept to see how hard it would be to write a code editor th
 Why am I writing my own code editor ?
 
 * It's a fun exercise
-* I like to learn different programming lanugages but I have not yet found lightweight windows editor
+* I like to learn different programming lanugages but I have not yet found lightweight windows code editor
 * Lightweight to me mean: fast to start, reactive UI, bare minimun features
 * I want multi row tabs
 * I want an embeded command shell

@@ -21,6 +21,12 @@ Why am I writing my own code editor ?
 
 This is where we have a fun and see how the baby is growing :smiley:
 
+## Version 2
+
+Now I can open a folder and expand sub folders. Clicking on a file opens it the currently selected tab.
+
+![shot](https://github.com/lepinay/myedit/blob/master/Versions/2.png) 
+
 ## Version 1
 
 ### Design 

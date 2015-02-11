@@ -25,7 +25,7 @@ This is where we have a fun and see how the baby is growing :smiley:
 
 Now I can open a folder and expand sub folders. Clicking on a file opens it the currently selected tab.
 
-![shot](https://github.com/lepinay/myedit/blob/master/Versions/2.png) 
+![shot](/Versions/2.png) 
 
 ## Version 1
 
@@ -42,7 +42,7 @@ Now I can open a folder and expand sub folders. Clicking on a file opens it the 
 * It's possible to send command and it displays the output !
 * It's slow !
 
-![shot](https://github.com/lepinay/myedit/blob/master/Versions/1.png) 
+![shot](/Versions/1.png) 
 
 
 

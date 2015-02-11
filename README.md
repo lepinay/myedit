@@ -1,6 +1,6 @@
 # myedit
 
-This is a proof of concept to see how hard it would be to write a code editor that
+This is a **proof of concept** to see how hard it would be to write a code editor that
 
 * Is native (WPF), no html/javascript: I really like the idea behind Brackets/Atom but here I want things blazing fast
 * Embeded terminal to be able to run command within the editor

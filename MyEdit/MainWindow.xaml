@@ -4,7 +4,29 @@
         xmlns:t="clr-namespace:Simple.Wpf.Terminal;assembly=Simple.Wpf.Terminal"
         xmlns:i="http://schemas.microsoft.com/expression/2010/interactivity"
         Title="MainWindow" Height="350" Width="525" WindowStyle="ToolWindow" WindowState="Maximized">
-    <DockPanel LastChildFill="True" >
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- Light Theme -->
+                <ResourceDictionary Source="Themes/Light/Metro.MSControls.Core.Implicit.xaml" />
+                <ResourceDictionary Source="Themes/Light/Metro.MSControls.Toolkit.Implicit.xaml" />
+
+                <!-- Dark Theme -->
+                <!--<ResourceDictionary Source="Themes/Dark/MetroDark.MSControls.Core.Implicit.xaml" />
+                <ResourceDictionary Source="Themes/Dark/MetroDark.MSControls.Toolkit.Implicit.xaml" />-->
+
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Light Theme -->
+            <SolidColorBrush x:Key="BackgroundKey" Color="#FFFFFF" />
+
+            <!-- Dark Theme -->
+            <!--<SolidColorBrush x:Key="BackgroundKey" Color="#FF181818" />-->
+
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <DockPanel LastChildFill="True" Background="{StaticResource BackgroundKey}" >
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
                 <MenuItem Header="_Open" Click="MenuItem_Click"/>
@@ -84,7 +106,7 @@
                 <TabItem Header="Some other file">File</TabItem>
                 <TabItem Header="Some other file">File</TabItem>
                 <TabItem Header="Some other file">File</TabItem>
-                <TabItem Header="Some other file">File</TabItem>
+                <TabItem Header="Some other file" Style="{StaticResource HeaderTextBlockStyle}">File</TabItem>
             </TabControl>
         </Grid>
     </DockPanel>

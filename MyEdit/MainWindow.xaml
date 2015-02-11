@@ -7,7 +7,8 @@
     <DockPanel LastChildFill="True" >
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
-                <MenuItem Header="_Open"/>
+                <MenuItem Header="_Open" Click="MenuItem_Click"/>
+                <MenuItem Header="_Open Folder" Click="MenuItem_Click_1"/>
                 <MenuItem Header="_Close"/>
                 <MenuItem Header="_Save"/>
             </MenuItem>
@@ -18,11 +19,12 @@
                 <ColumnDefinition Width="5" ></ColumnDefinition>
                 <ColumnDefinition  Width="2*"></ColumnDefinition>
             </Grid.ColumnDefinitions>
-            <TreeView Grid.Column="0">
-                <TreeViewItem>
-                    <TreeViewItem>One</TreeViewItem>
-                </TreeViewItem>
-
+            <TreeView Grid.Column="0" Name="trvMenu" SelectedItemChanged="trvMenu_SelectedItemChanged">
+                <TreeView.ItemTemplate>
+                    <HierarchicalDataTemplate DataType="{x:Type MenuItem}" ItemsSource="{Binding Items}">
+                        <TextBlock Text="{Binding Title}" />
+                    </HierarchicalDataTemplate>
+                </TreeView.ItemTemplate>
             </TreeView>
             <GridSplitter 
                         Grid.Column="1" 

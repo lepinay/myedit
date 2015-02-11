@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ICSharpCode.AvalonEdit.Highlighting;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,6 +13,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Xml;
 
 namespace MyEdit
 {
@@ -23,6 +25,13 @@ namespace MyEdit
         public MainWindow()
         {
             InitializeComponent();
+            using (XmlTextReader reader = new XmlTextReader(@"Syntax\FS-Mode.xshd"))
+            {
+
+                this.textEditor.SyntaxHighlighting = ICSharpCode.AvalonEdit.Highlighting.Xshd.HighlightingLoader.Load(reader, HighlightingManager.Instance);
+
+            }
+
         }
     }
 }

@@ -22,7 +22,7 @@
                 <TreeViewItem>
                     <TreeViewItem>One</TreeViewItem>
                 </TreeViewItem>
-                
+
             </TreeView>
             <GridSplitter 
                         Grid.Column="1" 
@@ -48,7 +48,7 @@
             xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
             Name="textEditor"
             FontFamily="Consolas"
-            SyntaxHighlighting="C#"
+            SyntaxHighlighting="F#"
             FontSize="10pt" />
                         <GridSplitter 
                         Grid.ColumnSpan="1"

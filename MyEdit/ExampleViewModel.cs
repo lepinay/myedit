@@ -18,6 +18,7 @@ using ICSharpCode.AvalonEdit;
 using System.Xml;
 using ICSharpCode.AvalonEdit.Highlighting;
 using ICSharpCode.AvalonEdit.Document;
+using System.ComponentModel;
 
 // https://github.com/icsharpcode/SharpDevelop/blob/master/src/AddIns/BackendBindings/FSharpBinding/Resources/FS-Mode.xshd
 // https://github.com/icsharpcode/SharpDevelop/tree/master/src/Libraries/AvalonEdit/ICSharpCode.AvalonEdit/Highlighting/Resources
@@ -25,13 +26,50 @@ using ICSharpCode.AvalonEdit.Document;
 namespace MyEdit
 {
 
-    public class PageModel
+    public class PageModel : INotifyPropertyChanged
     {
-        public string Title { get; set; }
-        public string TabCaption { get; set; }
+        private string tabCaption; 
+        public string TabCaption 
+        {
+            get
+            {
+                return tabCaption;
+            }
+            set
+            {
+                tabCaption = value;
+                NotifyPropertyChanged("TabCaption");
+            }
+        }
+
+        private bool isSelected;
+        public bool IsSelected 
+        {
+            get
+            {
+                return isSelected;
+            }
+            set
+            {
+                isSelected = value;
+                NotifyPropertyChanged("IsSelected");
+            }
+        }
+
         public TextDocument Document { get; set; }
         public FrameworkElement TabContent { get; set; }
         public IHighlightingDefinition Syntax { get; set; }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void NotifyPropertyChanged(String propertyName)
+        {
+            PropertyChangedEventHandler handler = PropertyChanged;
+            if (null != handler)
+            {
+                handler(this, new PropertyChangedEventArgs(propertyName));
+            }
+        }
     }
 
 
@@ -47,7 +85,7 @@ namespace MyEdit
         private Runspace myRunSpace;
         private PowerShell powershell;
         private App app;
-        private TextEditor editor;
+        //private TextEditor editor;
         private IHighlightingDefinition haskellSyntax;
 
 
@@ -85,7 +123,7 @@ namespace MyEdit
 
             _executeItemCommand = new RelayCommand<string>(AddItem, x => true);
 
-            editor = new TextEditor();
+            //editor = new TextEditor();
             using (XmlTextReader reader = new XmlTextReader(@"Syntax\FS-Mode.xshd"))
             {
                 haskellSyntax = ICSharpCode.AvalonEdit.Highlighting.Xshd.HighlightingLoader.Load(reader, HighlightingManager.Instance);
@@ -125,17 +163,39 @@ namespace MyEdit
 
         public ObservableCollection<PageModel> PageModels { get; set; }
 
-        internal void NewTab(string p)
+        internal void NewTab(string title, string path, string p)
         {
             var _doc = new ICSharpCode.AvalonEdit.Document.TextDocument(p);
+            var editor = new TextEditor();
+            editor.ContextMenu = new ContextMenu();
             editor.Document = _doc;
-            var page = new PageModel { Title = "page 1", TabContent = editor, TabCaption = "File 1", Document = _doc, Syntax = haskellSyntax };
+            editor.Document.FileName = path;
+            editor.Document.TextChanged += Document_TextChanged;
+            editor.SyntaxHighlighting = haskellSyntax;
+            var page = new PageModel { TabContent = editor, TabCaption = title, Document = _doc, Syntax = haskellSyntax, IsSelected = true };
             this.PageModels.Add(page);
         }
 
-        internal void SwitchContent(string doc)
+        void Document_TextChanged(object sender, EventArgs e)
         {
-            NewTab(doc);
+            var page = PageModels
+                .First(pm => sender == pm.Document);
+
+            if (!page.TabCaption.EndsWith("*")) page.TabCaption += "*";
+        }
+
+
+
+        internal void SwitchContent(string title, string path, string doc)
+        {
+            NewTab(title, path, doc);
+        }
+
+        internal void Save()
+        {
+            var page = PageModels.First(pm => pm.IsSelected);
+            (page.TabContent as TextEditor).Save(page.Document.FileName);
+            page.TabCaption = page.TabCaption.Replace("*", "");
         }
     }
 }

@@ -35,6 +35,53 @@
                 <MenuItem Header="_Save"/>
             </MenuItem>
         </Menu>
+        <ToolBar DockPanel.Dock="Top">
+            <ToolBar.Resources>
+                <Style TargetType="{x:Type Image}">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType={x:Type ButtonBase}, AncestorLevel=1}, Path=IsEnabled}" Value="False">
+                            <Setter Property="Opacity" Value="0.30" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </ToolBar.Resources>
+            <Button Click="Button_Click_1">
+                <Image Source="/Images/Open.png" Height="16"/>
+            </Button>
+            <Button Click="Save">
+                <Image Source="/Images/Save.png" Height="16"/>
+            </Button>
+            <Separator/>
+            <Button Command="Cut">
+                <Image Source="/Images/Cut.png" Height="16"/>
+            </Button>
+            <Button Command="Copy">
+                <Image Source="/Images/Copy.png" Height="16"/>
+            </Button>
+            <Button Command="Paste">
+                <Image Source="/Images/Paste.png" Height="16"/>
+            </Button>
+            <Button Command="Delete">
+                <Image Source="/Images/Delete.png" Height="16"/>
+            </Button>
+            <Separator/>
+            <Button Command="Undo">
+                <Image Source="/Images/Undo.png" Height="16"/>
+            </Button>
+            <Button Command="Redo">
+                <Image Source="/Images/Redo.png" Height="16"/>
+            </Button>
+            <Separator/>
+            <CheckBox IsChecked="{Binding ElementName=textEditor,Path=WordWrap}">
+                <Image Source="/Images/WordWrap.png" Height="16"/>
+            </CheckBox>
+            <CheckBox IsChecked="{Binding ElementName=textEditor,Path=ShowLineNumbers}">
+                <TextBlock Width="16" TextAlignment="Center">#</TextBlock>
+            </CheckBox>
+            <CheckBox IsChecked="{Binding ElementName=textEditor,Path=Options.ShowEndOfLine}">
+                <TextBlock Width="16" TextAlignment="Center">¶</TextBlock>
+            </CheckBox>
+        </ToolBar>
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" ></ColumnDefinition>
@@ -55,101 +102,48 @@
                         ResizeDirection="Columns"
                         ShowsPreview="True"  Width="5"  Cursor="SizeWE"   />
 
-            <TabControl Grid.Column="2" ItemsSource="{Binding PageModels, Mode=TwoWay}" SelectionChanged="TabControl_SelectionChanged">
-                <TabControl.ContentTemplate>
-                    <DataTemplate>
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="*" />
-                                <RowDefinition Height="5" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <avalonEdit:TextEditor
-                Grid.Column="0"
-                Grid.Row="0"
-            xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
-            Name="textEditor"
-            FontFamily="Consolas"
-            ShowLineNumbers="True"
-            Document="{Binding Document}"
-            SyntaxHighlighting="{Binding Syntax}"
-            FontSize="10pt" />
-                            <GridSplitter 
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="5" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TabControl ItemsSource="{Binding PageModels, Mode=TwoWay}" SelectionChanged="TabControl_SelectionChanged">
+                    <TabControl.ItemContainerStyle>
+                        <Style TargetType="TabItem">
+                            <Setter Property="Header" Value="{Binding TabCaption, Mode=TwoWay}"/>
+                            <Setter Property="Content" Value="{Binding TabContent}"/>
+                            <Setter Property="IsSelected" Value="{Binding IsSelected}"/>
+                        </Style>
+                    </TabControl.ItemContainerStyle>
+                </TabControl>
+                <GridSplitter 
                         Grid.ColumnSpan="1"
                         Grid.Row="1" 
                         VerticalAlignment="Center" 
                         HorizontalAlignment="Stretch" 
                         ResizeDirection="Rows"
                         ShowsPreview="True"  Height="5"  Cursor="SizeNS"   />
-                            <t:Terminal Grid.Row="2" Grid.Column="0" x:Name="TerminalOutput"
+                <t:Terminal Grid.Row="2" Grid.Column="0" x:Name="TerminalOutput"
                     IsReadOnlyCaretVisible="False"
                     VerticalScrollBarVisibility="Visible"
                     IsReadOnly="false"
                     Prompt=">"
                     ItemsSource="{Binding Path=Items, Mode=OneWay}">
 
-                                <i:Interaction.Triggers>
-                                    <i:EventTrigger EventName="LineEntered">
-                                        <i:InvokeCommandAction Command="{Binding Path=ExecuteItemCommand, Mode=OneWay}"
+                    <i:Interaction.Triggers>
+                        <i:EventTrigger EventName="LineEntered">
+                            <i:InvokeCommandAction Command="{Binding Path=ExecuteItemCommand, Mode=OneWay}"
                                            CommandParameter="{Binding Path=Line, Mode=OneWay, ElementName=TerminalOutput}" />
-                                    </i:EventTrigger>
-                                </i:Interaction.Triggers>
+                        </i:EventTrigger>
+                    </i:Interaction.Triggers>
 
-                            </t:Terminal>
-                        </Grid>
-                    </DataTemplate>
-                </TabControl.ContentTemplate>
-                <TabControl.ItemContainerStyle>
-                    <Style TargetType="TabItem">
-                        <Setter Property="Header" Value="{Binding TabCaption}"/>
-                    </Style>
-                </TabControl.ItemContainerStyle>
-                <!--<TabItem Header="File">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="5" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <avalonEdit:TextEditor
-                Grid.Column="0"
-                Grid.Row="0"
-            xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
-            Name="textEditor"
-            FontFamily="Consolas"
-            SyntaxHighlighting="F#"
-            FontSize="10pt" />
-                        <GridSplitter 
-                        Grid.ColumnSpan="1"
-                        Grid.Row="1" 
-                        VerticalAlignment="Center" 
-                        HorizontalAlignment="Stretch" 
-                        ResizeDirection="Rows"
-                        ShowsPreview="True"  Height="5"  Cursor="SizeNS"   />
-                        <t:Terminal Grid.Row="2" Grid.Column="0" x:Name="TerminalOutput"
-                    IsReadOnlyCaretVisible="False"
-                    VerticalScrollBarVisibility="Visible"
-                    IsReadOnly="false"
-                    Prompt=">"
-                    ItemsSource="{Binding Path=Items, Mode=OneWay}">
+                </t:Terminal>
+            </Grid>
 
-                            <i:Interaction.Triggers>
-                                <i:EventTrigger EventName="LineEntered">
-                                    <i:InvokeCommandAction Command="{Binding Path=ExecuteItemCommand, Mode=OneWay}"
-                                           CommandParameter="{Binding Path=Line, Mode=OneWay, ElementName=TerminalOutput}" />
-                                </i:EventTrigger>
-                            </i:Interaction.Triggers>
-
-                        </t:Terminal>
-                    </Grid>
-                </TabItem>-->
-            </TabControl>
         </Grid>
     </DockPanel>
 </Window>

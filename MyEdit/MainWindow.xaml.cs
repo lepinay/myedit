@@ -42,7 +42,7 @@ namespace MyEdit
             if (result == true)
             {
                 string filename = dlg.FileName;
-                (DataContext as ExampleViewModel).NewTab(System.IO.File.ReadAllText(filename));
+                (DataContext as ExampleViewModel).NewTab( System.IO.Path.GetFileName(filename), filename,  System.IO.File.ReadAllText(filename));
             }
         }
 
@@ -95,7 +95,7 @@ namespace MyEdit
                 else
                 {
                     var doc = System.IO.File.ReadAllText(path);
-                    (DataContext as ExampleViewModel).SwitchContent(doc);
+                    (DataContext as ExampleViewModel).SwitchContent(System.IO.Path.GetFileName(path), path, doc);
                 }
             }
         }
@@ -103,6 +103,21 @@ namespace MyEdit
         private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
 
+        }
+
+        private void Button_Click(object sender, RoutedEventArgs e)
+        {
+
+        }
+
+        private void Button_Click_1(object sender, RoutedEventArgs e)
+        {
+
+        }
+
+        private void Save(object sender, RoutedEventArgs e)
+        {
+            (DataContext as ExampleViewModel).Save();
         }
     }
 

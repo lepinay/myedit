@@ -40,6 +40,12 @@
     <Reference Include="Microsoft.Expression.Interactions, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>packages\System.Windows.Interactivity.WPF.2.0.20525\lib\net40\Microsoft.Expression.Interactions.dll</HintPath>
     </Reference>
+    <Reference Include="Ookii.Dialogs">
+      <HintPath>Ookii.Dialogs\Ookii.Dialogs.dll</HintPath>
+    </Reference>
+    <Reference Include="Ookii.Dialogs.Wpf">
+      <HintPath>Ookii.Dialogs\Ookii.Dialogs.Wpf.dll</HintPath>
+    </Reference>
     <Reference Include="ReactiveUI">
       <HintPath>packages\reactiveui-core.6.4.0.1\lib\Net45\ReactiveUI.dll</HintPath>
     </Reference>

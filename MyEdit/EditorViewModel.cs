@@ -26,12 +26,26 @@ using System.Reactive.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interactivity;
+using System.IO;
+using Ookii.Dialogs.Wpf;
 
 // https://github.com/icsharpcode/SharpDevelop/blob/master/src/AddIns/BackendBindings/FSharpBinding/Resources/FS-Mode.xshd
 // https://github.com/icsharpcode/SharpDevelop/tree/master/src/Libraries/AvalonEdit/ICSharpCode.AvalonEdit/Highlighting/Resources
 
 namespace MyEdit
 {
+    public class MenuItem
+    {
+        public MenuItem()
+        {
+            this.Items = new ReactiveList<MenuItem>();
+        }
+
+        public string Title { get; set; }
+
+        public ReactiveList<MenuItem> Items { get; set; }
+    }
+
 
     public class PageModel : ReactiveObject
     {
@@ -49,19 +63,6 @@ namespace MyEdit
             set { this.RaiseAndSetIfChanged(ref isSelected, value); }
         }
 
-        //private TextDocument document;
-        //public TextDocument Document
-        //{
-        //    get { return document; }
-        //    set { this.RaiseAndSetIfChanged(ref document, value); }
-        //}
-
-        //private int offset;
-        //public int Offset
-        //{
-        //    get { return offset; }
-        //    set { this.RaiseAndSetIfChanged(ref offset, value); }
-        //}
 
         private FrameworkElement tabContent;
         public FrameworkElement TabContent
@@ -70,12 +71,6 @@ namespace MyEdit
             set { this.RaiseAndSetIfChanged(ref tabContent, value); }
         }
 
-        //private IHighlightingDefinition syntax;
-        //public IHighlightingDefinition Syntax
-        //{
-        //    get { return syntax; }
-        //    set { this.RaiseAndSetIfChanged(ref syntax, value); }
-        //}
 
     }
 
@@ -83,15 +78,17 @@ namespace MyEdit
     public sealed class EditorViewModel : ReactiveObject
     {
         public ICommand ExecuteItemCommand { get; set; }
+        public ICommand TextChanged { get; set; }
         public ReactiveCommand<TabCommand> OpenFile { get; set; }
+        public ReactiveCommand<string> OpenFolder { get; set; }
+        public ReactiveCommand<MenuItem> TreeviewSelectedItemChanged { get; set; }
         public ReactiveList<string> Items { get; set; }
-
-        private Process process;
+        public ReactiveList<MenuItem> Tree { get; set; }
+        public ReactiveList<PageModel> PageModels { get; set; }
         private MyHost myHost;
         private Runspace myRunSpace;
         private PowerShell powershell;
         private App app;
-        //private TextEditor editor;
         private IHighlightingDefinition haskellSyntax;
 
 
@@ -100,29 +97,28 @@ namespace MyEdit
             RxApp.MainThreadScheduler = new DispatcherScheduler(Application.Current.Dispatcher);
             this.app = app;
 
+            Tree = new ReactiveList<MenuItem>();
             Items = new ReactiveList<string>();
 
-            var executingAssembly = Assembly.GetExecutingAssembly();
-            foreach (var assembly in executingAssembly.GetReferencedAssemblies())
+            TreeviewSelectedItemChanged = ReactiveCommand.CreateAsyncTask(o =>
             {
-                Items.Add("Referenced assembly: " + assembly.FullName);
-            }
+                return Task.Factory.StartNew(() =>
+                {
+                    return o as MenuItem;
+                });
+            });
 
-            Items.Add(string.Empty);
-            Items.Add(string.Empty);
-            Items.Add("Type a line and press ENTER, it will be added to the output...");
-            Items.Add(string.Empty);
-
+            TreeviewSelectedItemChanged.Subscribe(item =>
+            {
+                if (Directory.Exists(item.Title)) expandFolder(item);
+                else openTab(new TabCommand { Title = System.IO.Path.GetFileName(item.Title), Path = item.Title, Content = System.IO.File.ReadAllText(item.Title) });
+            });
 
             myHost = new MyHost(app, Items);
             myRunSpace = RunspaceFactory.CreateRunspace(myHost);
             myRunSpace.Open();
             powershell = PowerShell.Create();
             powershell.Runspace = myRunSpace;
-            string script = @"ls c:\perso";
-            powershell.AddScript(script);
-            powershell.AddCommand("out-default");
-            powershell.Invoke();
 
 
             ExecuteItemCommand = ReactiveCommand.CreateAsyncTask(o =>
@@ -133,9 +129,10 @@ namespace MyEdit
 
             TextChanged = ReactiveCommand.CreateAsyncTask(o =>
             {
-                return Task.Factory.StartNew(() => {
+                return Task.Factory.StartNew(() =>
+                {
                     var page = PageModels.First(p => p.IsSelected);
-                    if (!page.TabCaption.EndsWith("*")) page.TabCaption += "*"; 
+                    if (!page.TabCaption.EndsWith("*")) page.TabCaption += "*";
                 });
             });
 
@@ -150,7 +147,7 @@ namespace MyEdit
                     if (result == true)
                     {
                         string filename = dlg.FileName;
-                        var pm = new TabCommand{Title = System.IO.Path.GetFileName(filename), Path = filename, Content= System.IO.File.ReadAllText(filename) };
+                        var pm = new TabCommand { Title = System.IO.Path.GetFileName(filename), Path = filename, Content = System.IO.File.ReadAllText(filename) };
                         return pm;
                     }
                     else return null;
@@ -158,23 +155,22 @@ namespace MyEdit
 
             }, RxApp.MainThreadScheduler);
 
-            OpenFile.Subscribe(pm => {
-                var _doc = new ICSharpCode.AvalonEdit.Document.TextDocument(pm.Content);
-                var editor = new TextEditor();
-                editor.Document = _doc;
-                editor.Document.FileName = pm.Path;
-                var trigger = new System.Windows.Interactivity.EventTrigger();
-                trigger.EventName = "TextChanged";
+            OpenFolder = ReactiveCommand.CreateAsyncTask(o =>
+            {
+                return Task.Factory.StartNew(() =>
+                {
+                    var dialog = new VistaFolderBrowserDialog();
+                    var result = dialog.ShowDialog();
+                    return dialog.SelectedPath;
+                });
 
-                var action = new InvokeCommandAction {  Command = TextChanged };
-                trigger.Actions.Add(action);
-                trigger.Attach(editor); 
-                editor.SyntaxHighlighting = haskellSyntax;
-                var tab =new PageModel { TabContent = editor, TabCaption = pm.Title, /*Document = _doc, Syntax = haskellSyntax,*/ IsSelected = true };
-                PageModels.Add(tab); 
             });
 
-                        
+            OpenFolder.Subscribe(openFolder);
+
+            OpenFile.Subscribe(openTab);
+
+
 
 
             using (XmlTextReader reader = new XmlTextReader(@"Syntax\FS-Mode.xshd"))
@@ -185,6 +181,48 @@ namespace MyEdit
             this.PageModels = new ReactiveList<PageModel>();
         }
 
+        private void openTab(TabCommand pm)
+        {
+            var _doc = new ICSharpCode.AvalonEdit.Document.TextDocument(pm.Content);
+            var editor = new TextEditor();
+            editor.Document = _doc;
+            editor.Document.FileName = pm.Path;
+            var trigger = new System.Windows.Interactivity.EventTrigger();
+            trigger.EventName = "TextChanged";
+
+            var action = new InvokeCommandAction { Command = TextChanged };
+            trigger.Actions.Add(action);
+            trigger.Attach(editor);
+            editor.SyntaxHighlighting = haskellSyntax;
+            var tab = new PageModel { TabContent = editor, TabCaption = pm.Title, /*Document = _doc, Syntax = haskellSyntax,*/ IsSelected = true };
+            PageModels.Add(tab);
+        }
+
+        private void openFolder(string p)
+        {
+            Tree.Clear();
+            MenuItem root = new MenuItem() { Title = p };
+            foreach (var d in Directory.EnumerateDirectories(p).Union(Directory.EnumerateFiles(p)))
+            {
+                var child = new MenuItem() { Title = d };
+                root.Items.Add(child);
+            }
+
+            Tree.Add(root);
+        }
+
+        private void expandFolder(MenuItem root)
+        {
+            root.Items.Clear();
+            foreach (var d in Directory.EnumerateDirectories(root.Title).Union(Directory.EnumerateFiles(root.Title)))
+            {
+                var child = new MenuItem() { Title = d };
+                root.Items.Add(child);
+            }
+        }
+
+
+
         private void AddItem(string item)
         {
             powershell.AddScript(item);
@@ -192,44 +230,6 @@ namespace MyEdit
             powershell.Invoke();
         }
 
-        public ReactiveList<PageModel> PageModels { get; set; }
-        public ICommand TextChanged { get; set; }
-
-        internal PageModel NewTab(string title, string path, string p)
-        {
-            var _doc = new ICSharpCode.AvalonEdit.Document.TextDocument(p);
-            var editor = new TextEditor();
-            //editor.ContextMenu = new ContextMenu();
-            editor.Document = _doc;
-            editor.Document.FileName = path;
-            editor.SyntaxHighlighting = haskellSyntax;
-            editor.Document.TextChanged += Document_TextChanged;
-
-            //var trigger = new System.Windows.Interactivity.EventTrigger();
-            //trigger.EventName = "TextChanged";
-
-            //var action = new InvokeCommandAction {  Command = TextChanged };
-            //trigger.Actions.Add(action);
-            //trigger.Attach(editor); 
-            
-            var pm = new PageModel { TabContent = editor, TabCaption = title, /*Document = _doc, Syntax = haskellSyntax,*/ IsSelected = true};
-            //editor.Document.WhenAny(o => o.Text, t => { if (!pm.TabCaption.EndsWith("*")) pm.TabCaption += "*"; });
-            //this.PageModels.Add(page);
-            return pm;
-
-        }
-
-        void Document_TextChanged(object sender, EventArgs e)
-        {
-            throw new NotImplementedException();
-        }
-
-
-
-        internal void SwitchContent(string title, string path, string doc)
-        {
-            NewTab(title, path, doc);
-        }
 
         internal void Save()
         {
@@ -237,5 +237,6 @@ namespace MyEdit
             //(page.TabContent as TextEditor).Save(page.Document.FileName);
             //page.TabCaption = page.TabCaption.Replace("*", "");
         }
+
     }
 }

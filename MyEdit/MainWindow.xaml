@@ -27,13 +27,13 @@
     </Window.Resources>
 
     <DockPanel LastChildFill="True" Background="{StaticResource BackgroundKey}" >
-        <Menu DockPanel.Dock="Top">
+        <Menu DockPanel.Dock="Top" >
             <MenuItem Header="_File">
                 <MenuItem Header="_Open" Command="{Binding Path=OpenFile, Mode=OneWay}"/>
-                <MenuItem Header="_Open Folder" Click="MenuItem_Click_1"/>
+                <MenuItem Header="_Open Folder" Command="{Binding Path=OpenFolder, Mode=OneWay}"/>
                 <MenuItem Header="_Close"/>
                 <MenuItem Header="_Save"/>
-            </MenuItem>
+            </MenuItem>            
         </Menu>
         <ToolBar DockPanel.Dock="Top">
             <ToolBar.Resources>
@@ -45,10 +45,10 @@
                     </Style.Triggers>
                 </Style>
             </ToolBar.Resources>
-            <Button Click="Button_Click_1">
+            <Button>
                 <Image Source="/Images/Open.png" Height="16"/>
             </Button>
-            <Button Click="Save">
+            <Button>
                 <Image Source="/Images/Save.png" Height="16"/>
             </Button>
             <Separator/>
@@ -88,12 +88,18 @@
                 <ColumnDefinition Width="5" ></ColumnDefinition>
                 <ColumnDefinition  Width="2*"></ColumnDefinition>
             </Grid.ColumnDefinitions>
-            <TreeView Grid.Column="0" Name="trvMenu" SelectedItemChanged="trvMenu_SelectedItemChanged">
+            <TreeView Grid.Column="0" Name="trvMenu" ItemsSource="{Binding Tree}">
                 <TreeView.ItemTemplate>
                     <HierarchicalDataTemplate DataType="{x:Type MenuItem}" ItemsSource="{Binding Items}">
                         <TextBlock Text="{Binding Title}" />
                     </HierarchicalDataTemplate>
                 </TreeView.ItemTemplate>
+                <i:Interaction.Triggers>
+                    <i:EventTrigger EventName="SelectedItemChanged">
+                        <i:InvokeCommandAction Command="{Binding TreeviewSelectedItemChanged}" 
+                                               CommandParameter="{Binding ElementName=trvMenu, Path=SelectedItem}"/>
+                    </i:EventTrigger>
+                </i:Interaction.Triggers>
             </TreeView>
             <GridSplitter 
                         Grid.Column="1" 
@@ -111,7 +117,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <TabControl ItemsSource="{Binding PageModels, Mode=TwoWay}" SelectionChanged="TabControl_SelectionChanged">
+                <TabControl ItemsSource="{Binding PageModels, Mode=TwoWay}">
                     <TabControl.ItemContainerStyle>
                         <Style TargetType="TabItem">
                             <Setter Property="Header" Value="{Binding TabCaption, Mode=TwoWay}"/>
@@ -142,6 +148,7 @@
                     IsReadOnlyCaretVisible="False"
                     VerticalScrollBarVisibility="Visible"
                     IsReadOnly="false"
+                    FontFamily="Consolas"
                     Prompt=">"
                     ItemsSource="{Binding Path=Items, Mode=OneWay}">
 

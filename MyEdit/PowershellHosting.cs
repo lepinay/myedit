@@ -12,12 +12,13 @@ using System.Management.Automation.Runspaces;
 using PowerShell = System.Management.Automation.PowerShell;
 using System.Management.Automation.Host;
 using System.Globalization;
+using ReactiveUI;
 
 namespace MyEdit
 {
     internal class MyHost : PSHost
     {
-        public MyHost(App app, ObservableCollection<string> items)
+        public MyHost(App app, ReactiveList<string> items)
         {
             this.items = items;
             myHostUserInterface = new MyHostUserInterface(app, items);
@@ -50,7 +51,7 @@ namespace MyEdit
         /// class for this application.
         /// </summary>
         private MyHostUserInterface myHostUserInterface;
-        private ObservableCollection<string> items;
+        private ReactiveList<string> items;
 
         /// <summary>
         /// Gets the culture information to use. This implementation 
@@ -308,7 +309,7 @@ namespace MyEdit
 
     internal class MyHostUserInterface : PSHostUserInterface
     {
-        public MyHostUserInterface(App app, ObservableCollection<string> items)
+        public MyHostUserInterface(App app, ReactiveList<string> items)
         {
             _items = items;
             this.app = app;
@@ -335,7 +336,7 @@ namespace MyEdit
         }
 
         private MyRawUserInterface myRawUi = new MyRawUserInterface();
-        private ObservableCollection<string> _items;
+        private ReactiveList<string> _items;
         private App app;
 
         public override PSHostRawUserInterface RawUI

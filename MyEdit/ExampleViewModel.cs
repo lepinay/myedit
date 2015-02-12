@@ -19,6 +19,7 @@ using System.Xml;
 using ICSharpCode.AvalonEdit.Highlighting;
 using ICSharpCode.AvalonEdit.Document;
 using System.ComponentModel;
+using ReactiveUI;
 
 // https://github.com/icsharpcode/SharpDevelop/blob/master/src/AddIns/BackendBindings/FSharpBinding/Resources/FS-Mode.xshd
 // https://github.com/icsharpcode/SharpDevelop/tree/master/src/Libraries/AvalonEdit/ICSharpCode.AvalonEdit/Highlighting/Resources
@@ -28,8 +29,8 @@ namespace MyEdit
 
     public class PageModel : INotifyPropertyChanged
     {
-        private string tabCaption; 
-        public string TabCaption 
+        private string tabCaption;
+        public string TabCaption
         {
             get
             {
@@ -43,7 +44,7 @@ namespace MyEdit
         }
 
         private bool isSelected;
-        public bool IsSelected 
+        public bool IsSelected
         {
             get
             {
@@ -73,13 +74,14 @@ namespace MyEdit
     }
 
 
-    public sealed class ExampleViewModel : BaseViewModel
+    public sealed class ExampleViewModel : ReactiveObject
     {
         /// <summary>
         /// lots of this stuff shouldnt be in view model of course :D
         /// </summary>
-        private ICommand _executeItemCommand;
-        private readonly ObservableCollection<string> _items;
+        public ICommand ExecuteItemCommand { get; set; }
+        public ReactiveList<string> Items { get; set; }
+
         private Process process;
         private MyHost myHost;
         private Runspace myRunSpace;
@@ -93,21 +95,21 @@ namespace MyEdit
         {
             this.app = app;
 
-            _items = new ObservableCollection<string>();
+            Items = new ReactiveList<string>();
 
             var executingAssembly = Assembly.GetExecutingAssembly();
             foreach (var assembly in executingAssembly.GetReferencedAssemblies())
             {
-                _items.Add("Referenced assembly: " + assembly.FullName);
+                Items.Add("Referenced assembly: " + assembly.FullName);
             }
 
-            _items.Add(string.Empty);
-            _items.Add(string.Empty);
-            _items.Add("Type a line and press ENTER, it will be added to the output...");
-            _items.Add(string.Empty);
+            Items.Add(string.Empty);
+            Items.Add(string.Empty);
+            Items.Add("Type a line and press ENTER, it will be added to the output...");
+            Items.Add(string.Empty);
 
 
-            myHost = new MyHost(app, _items);
+            myHost = new MyHost(app, Items);
             myRunSpace = RunspaceFactory.CreateRunspace(myHost);
             myRunSpace.Open();
             powershell = PowerShell.Create();
@@ -118,50 +120,28 @@ namespace MyEdit
             powershell.Invoke();
 
 
-            // Check the flags and see if they were set propertly.
+            ExecuteItemCommand = ReactiveCommand.CreateAsyncTask(o =>
+            { 
+                return Task.Factory.StartNew(() => AddItem(o.ToString())); 
+            });
 
 
-            _executeItemCommand = new RelayCommand<string>(AddItem, x => true);
-
-            //editor = new TextEditor();
             using (XmlTextReader reader = new XmlTextReader(@"Syntax\FS-Mode.xshd"))
             {
                 haskellSyntax = ICSharpCode.AvalonEdit.Highlighting.Xshd.HighlightingLoader.Load(reader, HighlightingManager.Instance);
             }
 
-            this.PageModels = new ObservableCollection<PageModel>();
-        }
-
-        public IEnumerable<string> Items
-        {
-            get { return _items; }
-        }
-
-        public ICommand ExecuteItemCommand
-        {
-            get
-            {
-                return _executeItemCommand;
-            }
-
-            set
-            {
-                SetPropertyAndNotify(ref _executeItemCommand, value, "ExecuteItemCommand");
-            }
+            this.PageModels = new ReactiveList<PageModel>();
         }
 
         private void AddItem(string item)
         {
-            Task.Run(() =>
-            {
-                powershell.AddScript(item);
-                powershell.AddCommand("out-default");
-                powershell.Invoke();
-            });
-
+            powershell.AddScript(item);
+            powershell.AddCommand("out-default");
+            powershell.Invoke();
         }
 
-        public ObservableCollection<PageModel> PageModels { get; set; }
+        public ReactiveList<PageModel> PageModels { get; set; }
 
         internal void NewTab(string title, string path, string p)
         {

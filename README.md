@@ -39,6 +39,10 @@ I want to be able to clearly see:
 * The events
 * How the ui is built from that
 
+Some resource on WPF and FRP
+http://steellworks.blogspot.com/2014/03/tutorial-functional-reactive.html
+
+
 ![shot](/Versions/3.png) 
 
 ## Version 2

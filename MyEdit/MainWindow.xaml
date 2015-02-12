@@ -29,7 +29,7 @@
     <DockPanel LastChildFill="True" Background="{StaticResource BackgroundKey}" >
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
-                <MenuItem Header="_Open" Click="MenuItem_Click"/>
+                <MenuItem Header="_Open" Command="{Binding Path=OpenFile, Mode=OneWay}"/>
                 <MenuItem Header="_Open Folder" Click="MenuItem_Click_1"/>
                 <MenuItem Header="_Close"/>
                 <MenuItem Header="_Save"/>
@@ -119,6 +119,17 @@
                             <Setter Property="IsSelected" Value="{Binding IsSelected}"/>
                         </Style>
                     </TabControl.ItemContainerStyle>
+                    <!--<TabControl.ContentTemplate>
+                        <DataTemplate>
+                            <avalonExt:MvvmTextEditor 
+                                                   Name="textEditor"   
+                                                   FontFamily="Consolas"  
+                                                   SyntaxHighlighting="{Binding Syntax, Mode=TwoWay}" 
+                                                   Document="{Binding Document, Mode=TwoWay}"
+                                                   CaretOffset="{Binding Offset, Mode=TwoWay}"
+                                                   FontSize="10pt" />
+                        </DataTemplate>
+                    </TabControl.ContentTemplate>-->
                 </TabControl>
                 <GridSplitter 
                         Grid.ColumnSpan="1"

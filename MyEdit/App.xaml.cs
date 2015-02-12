@@ -17,7 +17,7 @@ namespace MyEdit
         {
             base.OnStartup(e);
 
-            var window = new MainWindow { DataContext = new ExampleViewModel(this) };
+            var window = new MainWindow { DataContext = new EditorViewModel(this) };
 
             window.Show();
         }

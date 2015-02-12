@@ -33,19 +33,6 @@ namespace MyEdit
 
         }
 
-        private void MenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            Microsoft.Win32.OpenFileDialog dlg = new Microsoft.Win32.OpenFileDialog();
-            dlg.DefaultExt = ".cs";
-            dlg.Filter = "CSharp Files (*.cs)|*.cs|Haskell Files (*.hs)|*.hs|FSharp Files (*.fs)|*.fs";
-            Nullable<bool> result = dlg.ShowDialog();
-            if (result == true)
-            {
-                string filename = dlg.FileName;
-                (DataContext as ExampleViewModel).NewTab( System.IO.Path.GetFileName(filename), filename,  System.IO.File.ReadAllText(filename));
-            }
-        }
-
         private void MenuItem_Click_1(object sender, RoutedEventArgs e)
         {
             var dialog = new System.Windows.Forms.FolderBrowserDialog();
@@ -95,7 +82,7 @@ namespace MyEdit
                 else
                 {
                     var doc = System.IO.File.ReadAllText(path);
-                    (DataContext as ExampleViewModel).SwitchContent(System.IO.Path.GetFileName(path), path, doc);
+                    (DataContext as EditorViewModel).SwitchContent(System.IO.Path.GetFileName(path), path, doc);
                 }
             }
         }
@@ -117,7 +104,7 @@ namespace MyEdit
 
         private void Save(object sender, RoutedEventArgs e)
         {
-            (DataContext as ExampleViewModel).Save();
+            (DataContext as EditorViewModel).Save();
         }
     }
 

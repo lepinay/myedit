@@ -24,122 +24,172 @@ open FSharpx
 open System.Windows.Data
 open ICSharpCode.AvalonEdit
 open Simple.Wpf.Terminal
+open System.Xml
+open ICSharpCode.AvalonEdit.Highlighting
+
 //open ReactiveUI
 
 //#region helpers
-let lastChildFill b (dock:DockPanel) = dock.LastChildFill <- b
-
-let dock props (content:UIElement list) = 
-    let d = new DockPanel()
-    for p in props do p d
-    for c in content do d.Children.Add(c) |> ignore
-    d
-
-let item name clicks (childrens:MenuItem list) =
-    let i = new Controls.MenuItem(Header=name)
-    for c in childrens do i.Items.Add(c) |> ignore
-    for cl in clicks do
-        i.Click |> Observable.subscribe cl |> ignore
-    i
-
-let menu items =
-    let m = new Menu()
-    for i in items do m.Items.Add(i) |> ignore
-    DockPanel.SetDock(m,Dock.Top)
-    m
-
-let rows rows (grid:Grid) = for row in rows do grid.RowDefinitions.Add(new RowDefinition(Height=row))
-let cols cols (grid:Grid) = for col in cols do grid.ColumnDefinitions.Add(new ColumnDefinition(Width=col))
-
-let grid props (childrens:UIElement list) =
-    let g = new Grid()
-    for p in props do p g
-    for child in childrens do g.Children.Add(child) |> ignore
-    g
-
-let tree props = 
-    let t = new TreeView()
-    for p in props do p t
-    t
-
-let splitter props = 
-    let gs = new GridSplitter(VerticalAlignment=VerticalAlignment.Stretch,HorizontalAlignment=HorizontalAlignment.Center,ResizeDirection=GridResizeDirection.Columns,ShowsPreview=true,Width=5.)
-    for p in props do p gs
-    gs
-
-let itemTemplate template (tree:TreeView) = tree.ItemTemplate <- template
-let itemSource source (tree:TreeView) = tree.ItemsSource <- source
-
-let window c = 
-    let w = Window(Title="F# is fun!",Width=260., Height=420., Topmost = true)
-    w.Content <- c
-    w
-
-let show (w:Window) = w.Show()
-let verticalAlignment a (gs:GridSplitter) = gs.VerticalAlignment <- a
-let horizontalAlignment a (gs:GridSplitter) = gs.HorizontalAlignment <- a
-let resizeDirection a (gs:GridSplitter) = gs.ResizeDirection <- a
-let showsPreview a (gs:GridSplitter) = gs.ShowsPreview <- a
-let width a (gs:GridSplitter) = gs.Width <- a
-let height a (gs:GridSplitter) = gs.Height <- a
-let column a (gs:UIElement) = Grid.SetColumn(gs,a)
-let row a (gs:UIElement) = Grid.SetRow(gs,a)
-
-//#endregion
-
-type MenuItem() =
-    member val Title = "" with get, set
-    member val Items:MenuItem list = [] with get, set 
+type Column = GridLength
+type Row = GridLength
+type Title = String
+type SplitterDirection = Horizontal | Vertical
 
 
+type Element = 
+    | Docked of Element*Dock
+    | Column of Element*int
+    | Row of Element*int
+    | Dock of Element list
+    | Menu of Element list
+    | MenuItem of Title*Element list*(unit->unit) list
+    | Grid of Column list*Row list*Element list
+    | Splitter of SplitterDirection
+    | Terminal
+    | Tree of Element list
+    | TreeItem of Title*Element list
+    | Editor of String
+    | Tab of (String*Element) list
 
-//https://social.msdn.microsoft.com/Forums/vstudio/en-US/acc87765-618e-4afd-b695-df5144d904ac/hierarchicaldatatemplate-for-treeview-programmatically-c?forum=wpf    
-let template = new HierarchicalDataTemplate(typeof<MenuItem>)
-let labelFactory = new FrameworkElementFactory(typeof<TextBlock>);
-labelFactory.SetBinding(TextBlock.TextProperty, new Binding("Title"));
-template.ItemsSource <- new Binding("Items")
-template.VisualTree <- labelFactory
 
-let fontFamily s (t:Terminal) = t.FontFamily <- FontFamily(s)
-let terminal props items = 
-    let t = new Terminal()
-    for p in props do p t
-    t.ItemsSource <- items
-    t
+type EditorState = {
+    openFiles:(string*string) list
+}
 
-let items = new ReactiveUI.ReactiveList<string>(["Hello"])
+type Command =
+    | OpenFile of string
 
-let tab props = 
-    let t = new TabControl()
-    let ti = new TabItem()
-    let tb = new TextBlock()
-    tb.Text <- "Plop" 
-    ti.Content <- tb
-    ti.Header <- "zooo"
-    t.Items.Add(ti) |> ignore
-    for p in props do p t
-    t
+let messages = new Reactive.Subjects.Subject<Command>()
 
-dock 
-    [lastChildFill true]
-    [menu
-        [item "_File" []
-            [item "Open folder" [(fun e -> printfn "click")] []
-             item "Save" [] []]]
-     grid [cols [GridLength(1.,GridUnitType.Star);GridLength(5.);GridLength(2.,GridUnitType.Star)]]
-        [
-            tree [column 0;itemTemplate template;itemSource [MenuItem(Title="Hello :)", Items=[MenuItem(Title="World")])] ]
-            splitter [column 1;verticalAlignment VerticalAlignment.Stretch;horizontalAlignment HorizontalAlignment.Center;resizeDirection GridResizeDirection.Columns;showsPreview true;width 5.]
-            grid [column 2;rows [GridLength(1.,GridUnitType.Star);GridLength(5.);GridLength(1.,GridUnitType.Star)]; cols [GridLength(1.,GridUnitType.Star)]] 
-                [
-                    tab [row 0]
-                    splitter [row 1;verticalAlignment VerticalAlignment.Center;horizontalAlignment HorizontalAlignment.Stretch;resizeDirection GridResizeDirection.Rows;showsPreview true;height 5.]
-                    terminal [row 2;column 0;fontFamily "Consolas"] items
-                ]
-        ]
+let openFile () = 
+    let dlg = new Microsoft.Win32.OpenFileDialog();
+    dlg.DefaultExt <- ".cs";
+    dlg.Filter <- "CSharp Files (*.cs)|*.cs|Haskell Files (*.hs)|*.hs|FSharp Files (*.fs)|*.fs";
+    let result = dlg.ShowDialog();
+    ()
+    if result.HasValue && result.Value then
+        messages.OnNext(OpenFile dlg.FileName)
+    ()
+
+let openFolder () = 
+    printfn "open a folder"
+    ()
+
+let saveFile () = 
+    printfn "save a file"
+    ()
+
+let ui (state:EditorState) = 
+    let tabs = state.openFiles |> List.map (fun (t,p) -> (t,Editor p ) )
+    Dock [Docked(Menu [MenuItem ("File",
+                        [
+                        MenuItem ("Open file",[], [openFile] )
+                        MenuItem ("Open folder",[], [openFolder])
+                        MenuItem ("Save",[], [saveFile])], [])],Dock.Top)
+          Grid ([GridLength(1.,GridUnitType.Star);GridLength(5.);GridLength(2.,GridUnitType.Star)],[],[
+                    Column(Tree [TreeItem("Code",[TreeItem("HelloWorld",[])])] ,0)
+                    Column(Splitter Vertical,1)
+                    Column(
+                        Grid ([GridLength(1.,GridUnitType.Star)],[GridLength(1.,GridUnitType.Star);GridLength(5.);GridLength(1.,GridUnitType.Star)],
+                            [
+                                Row(Tab tabs,0)
+                                Row(Splitter Horizontal,1)
+                                Row(Terminal,2)
+                            ]),2)
+                ])
     ]
-|> window
-|> show
+
+let haskellSyntax = 
+    use reader = new XmlTextReader(System.IO.Path.Combine( __SOURCE_DIRECTORY__ ,@"Syntax\FS-Mode.xshd"))
+    ICSharpCode.AvalonEdit.Highlighting.Xshd.HighlightingLoader.Load(reader, HighlightingManager.Instance);
+
+let rec render ui : UIElement = 
+    match ui with
+        | Dock xs -> 
+            let d = new DockPanel(LastChildFill=true)
+            for x in xs do d.Children.Add (render x) |> ignore
+            d :> UIElement
+        | Terminal -> new Terminal() :> UIElement
+        | Tab xs ->
+            let t = new TabControl()
+            for (title,e) in xs do
+                let ti = new TabItem()
+                ti.Content <- render e
+                ti.Header <- title
+                t.Items.Add(ti) |> ignore
+            t :> UIElement
+        | Menu xs ->
+            let m = new Menu()
+            for x in xs do m.Items.Add (render x) |> ignore
+            m :> UIElement
+        | MenuItem (title,xs,actions) -> 
+            let mi = Controls.MenuItem(Header=title) 
+            for x in xs do mi.Items.Add(render x) |> ignore
+            match actions with 
+                | [action] -> mi.Click |> Observable.subscribe(fun e -> action()) |> ignore
+                | other -> ()
+            mi :> UIElement
+        | Grid (cols,rows,xs) ->
+            let g = new Grid()
+            for row in rows do g.RowDefinitions.Add(new RowDefinition(Height=row))
+            for col in cols do g.ColumnDefinitions.Add(new ColumnDefinition(Width=col))
+            for x in xs do g.Children.Add(render x) |> ignore
+            g :> UIElement
+        | Docked (e,d) ->
+            let elt = render e
+            DockPanel.SetDock(elt,d)
+            elt
+        | Column (e,d) ->
+            let elt = render e
+            Grid.SetColumn(elt,d)
+            elt
+        | Row (e,d) ->
+            let elt = render e
+            Grid.SetRow(elt,d)
+            elt
+        | Splitter Vertical ->
+            let gs = new GridSplitter(VerticalAlignment=VerticalAlignment.Stretch,HorizontalAlignment=HorizontalAlignment.Center,ResizeDirection=GridResizeDirection.Columns,ShowsPreview=true,Width=5.)
+            gs :> UIElement
+        | Splitter Horizontal ->
+            let gs = new GridSplitter(VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Stretch,ResizeDirection=GridResizeDirection.Rows,ShowsPreview=true,Height=5.)
+            gs :> UIElement
+        | Tree xs ->
+            let t = new TreeView()
+            for x in xs do t.Items.Add(render x) |> ignore
+            t :> UIElement
+        | TreeItem (title,xs) ->
+            let ti = new TreeViewItem()
+            ti.Header <- title
+            for x in xs do ti.Items.Add(render x) |> ignore
+            ti :> UIElement
+        | Editor path ->
+            let editor = new TextEditor();
+            let content = IO.File.ReadAllText(path)
+            let doc = new ICSharpCode.AvalonEdit.Document.TextDocument(content);
+            editor.Document <- doc;
+            editor.SyntaxHighlighting <- haskellSyntax;
+            editor :> UIElement
+        | other -> failwith "not handled"
+    
+
+let w =  new Window(Title="F# is fun!",Width=260., Height=420., Topmost = true)
+
+w.Show()
+w.Content <- render <| ui {openFiles=[("file 1",@"C:\perso\codingame\tge\src\Tge\Codingame.hs")]}        
+
+
+messages.Scan({openFiles=[("file 1",@"C:\perso\codingame\tge\src\Tge\Codingame.hs")]},
+            fun state cmd ->
+                match cmd with 
+                | OpenFile s -> {state with openFiles=[("file 1",s)]}      
+                | other -> state  )
+        .Subscribe(function s -> w.Content <- render <| ui s  )
+
+
+//        | OpenFile s -> w.Content <- render <| ui {openFiles=[("file 1",s)]}        
+
+
+
 
 
 

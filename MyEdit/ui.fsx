@@ -84,12 +84,17 @@ window.Content <-
     dock  [lastChildFill true]
             [menu 
                 [item "_File" []
-                    [item "Open folder" [(fun e -> printfn "click")] [];
-                        item "Save" [] []]];
-            grid [GridLength(1.,GridUnitType.Star);
-                  GridLength(5.);
-                  GridLength(2.,GridUnitType.Star)]
-                  [tree;splitter [column 1; verticalAlignment VerticalAlignment.Stretch;horizontalAlignment HorizontalAlignment.Center;resizeDirection GridResizeDirection.Columns; showsPreview true;width 5.] ]]
+                    [item "Open folder" [(fun e -> printfn "click")] []
+                     item "Save" [] []]]
+             grid [GridLength(1.,GridUnitType.Star)
+                   GridLength(5.)
+                   GridLength(2.,GridUnitType.Star)]
+                   [tree
+                    splitter [column 1 
+                              verticalAlignment VerticalAlignment.Stretch
+                              horizontalAlignment HorizontalAlignment.Center
+                              resizeDirection GridResizeDirection.Columns 
+                              showsPreview true;width 5.] ]]
 window.Show()
 
 

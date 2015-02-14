@@ -34,6 +34,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="FSharp.Core, Version=4.3.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL" />
     <Reference Include="FSharpx.TypeProviders.Xaml">
       <HintPath>packages\FSharpx.TypeProviders.Xaml.1.8.41\lib\40\FSharpx.TypeProviders.Xaml.dll</HintPath>
     </Reference>
@@ -247,6 +248,7 @@
     <None Include="Syntax\FS-Mode.xshd">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Include="ui.fsx" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
@@ -261,9 +263,6 @@
     <Resource Include="Images\Save.png" />
     <Resource Include="Images\Undo.png" />
     <Resource Include="Images\WordWrap.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="ui.fsx" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

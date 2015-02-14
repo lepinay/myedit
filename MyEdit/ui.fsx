@@ -13,6 +13,54 @@
 #r @"packages\reactiveui-core.6.4.0.1\lib\Net45\ReactiveUI.dll"
 #r @"packages\Splat.1.6.0\lib\Net45\Splat.dll"
 
+//#I "c:/Program Files/Reference Assemblies/Microsoft/Framework/v3.0"
+//#I "C:/WINDOWS/Microsoft.NET/Framework/v3.0/WPF/"
+//#r "PresentationCore.dll"
+//#r "PresentationFramework.dll"
+//#r "WindowsBase.dll"
+//#r @"System.Xaml"
+
+// #region This is to have wpf keyboqrd input working while running in fsi
+module WPFEventLoop =     
+    open System    
+    open System.Windows    
+    open System.Windows.Threading    
+    open Microsoft.FSharp.Compiler.Interactive    
+    open Microsoft.FSharp.Compiler.Interactive.Settings    
+
+    type RunDelegate<'b> = delegate of unit -> 'b     
+    let Create() =         
+        let app  =             
+            try                 
+                // Ensure the current application exists. This may fail, if it already does.                
+                let app = new Application() in                 
+                // Create a dummy window to act as the main window for the application.                
+                // Because we're in FSI we never want to clean this up.                
+                new Window() |> ignore;                 
+                app              
+            with :? InvalidOperationException -> Application.Current        
+        let disp = app.Dispatcher        
+        let restart = ref false        
+        { new IEventLoop with             
+            member x.Run() =                    
+                app.Run() |> ignore                 
+                !restart             
+
+            member x.Invoke(f) =                  
+                try 
+                    disp.Invoke(DispatcherPriority.Send,new RunDelegate<_>(fun () -> box(f ()))) |> unbox                 
+                with e -> eprintf "\n\n ERROR: %O\n" e; reraise()             
+
+            member x.ScheduleRestart() =   ()                 
+            //restart := true;                 
+            //app.Shutdown()        
+         }     
+
+    let Install() = fsi.EventLoop <-  Create()
+
+WPFEventLoop.Install()
+// #endregion
+
 open System
 open System.Windows          
 open System.Windows.Controls  
@@ -36,6 +84,7 @@ type Command =
     | BrowseFolder
     | SaveFile of string
     | OpenFile of string
+    | TextChanged of TextDocument
 
 type Element = 
     | Docked of Element*Dock
@@ -93,7 +142,7 @@ let ui (state:EditorState) =
                             [
                                 Row(Tab tabs,0)
                                 Row(Splitter Horizontal,1)
-                                Row(Terminal,2)
+//                                Row(Terminal,2)
                             ]),2)
                 ])
     ]
@@ -166,8 +215,9 @@ let rec render ui : UIElement =
         | Editor (doc,pos) ->
             let editor = new TextEditor();
             editor.Document <- doc;
+            editor.TextChanged |> Observable.subscribe(fun e -> messages.OnNext(TextChanged doc)  ) |> ignore
             editor.SyntaxHighlighting <- haskellSyntax;
-            editor.IsReadOnly <- false;
+//            editor.IsReadOnly <- false;
             editor :> UIElement
         | other -> failwith "not handled"
 
@@ -182,11 +232,17 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
     else 
         match (prev,curr,screen) with
             | (x::xs,y::ys,z::zs) when x = y -> z::resolve xs ys zs
+            | ((TabItem (ta,ea,ba))::xs,(TabItem (tb,eb,bb))::ys,z::zs) when tb.EndsWith("*") -> 
+                let ti = z :?> TabItem
+                ti.Header <- tb
+                ti.IsSelected <- true
+                z::resolve xs ys zs
             | ((Tab a)::xs,(Tab b)::ys,z::zs) -> 
                 let tab = z :?> TabControl     
                 let childrens = (itemsToList tab.Items)
                 tab.Items.Clear()
-                for c in resolve a b childrens do tab.Items.Add(c) |> ignore
+                for c in resolve a b childrens do 
+                    tab.Items.Add(c) |> ignore
                 (tab :> UIElement)::resolve xs ys zs
             | ((Dock a)::xs,(Dock b)::ys,z::zs) -> 
                 let dock = z :?> DockPanel     
@@ -212,14 +268,20 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
             | other -> failwith <| sprintf "not handled:\n%A" other
     
 
-let w =  new Window(Title="F# is fun!",Width=260., Height=420., Topmost = true)
 
+
+
+
+let w =  new Window(Title="F# is fun!",Width=260., Height=420., Topmost = true)
 w.Show()
 w.Content <- List.head <| resolve [] [ui {openFiles=[]}] [] 
 
 messages.Scan({openFiles=[]},
             fun state cmd ->
                 match cmd with 
+                | TextChanged doc ->
+                    let starize (t:String) = if t.EndsWith("*") then t else t+"*"
+                    {state with openFiles= List.map(fun (t,d,p,b) -> if d = doc then (starize t,d,p,b) else (t,d,p,b)) state.openFiles }      
                 | OpenFile s ->
                     let content = IO.File.ReadAllText(s)
                     let doc = new ICSharpCode.AvalonEdit.Document.TextDocument(content)

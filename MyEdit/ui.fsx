@@ -130,86 +130,121 @@ let reuseChildrens d (childrens:UIElementCollection) xs render =
         childrens.Clear()
         for x in xs do childrens.Add (render null x) |> ignore
 
-let rec render (prev:obj) ui : UIElement = 
+let rec render ui : UIElement = 
     match ui with
         | Dock xs -> 
-            let d = reuse prev (fun () -> new DockPanel(LastChildFill=true))
-            reuseChildrens d d.Children xs render
+            let d = new DockPanel(LastChildFill=true)
+            for x in xs do d.Children.Add (render x) |> ignore
             d :> UIElement
         | Terminal -> new Terminal() :> UIElement
         | Tab xs ->
             let t = new TabControl()
-            for (title,e,selected) in xs do
+            for (title,e,b) in xs do
                 let ti = new TabItem()
-                ti.Content <- render null e
+                ti.Content <- render e
                 ti.Header <- title
-                ti.IsSelected <- selected
                 t.Items.Add(ti) |> ignore
             t :> UIElement
         | Menu xs ->
-            let m = reuse prev (fun () -> new Menu())
-            for x in xs do m.Items.Add (render null x) |> ignore
+            let m = new Menu()
+            for x in xs do m.Items.Add (render x) |> ignore
             m :> UIElement
         | MenuItem (title,xs,actions) -> 
             let mi = Controls.MenuItem(Header=title) 
-            for x in xs do mi.Items.Add(render null x) |> ignore
+            for x in xs do mi.Items.Add(render x) |> ignore
             match actions with 
                 | [BrowseFile] -> mi.Click |> Observable.subscribe(fun e -> openFile()) |> ignore
                 | other -> ()
             mi :> UIElement
         | Grid (cols,rows,xs) ->
-            let g = reuse prev (fun () -> new Grid())
-
-            // reuse this if possible
-            g.RowDefinitions.Clear()
-            g.ColumnDefinitions.Clear()
+            let g = new Grid()
             for row in rows do g.RowDefinitions.Add(new RowDefinition(Height=row))
             for col in cols do g.ColumnDefinitions.Add(new ColumnDefinition(Width=col))
-
-            reuseChildrens g g.Children xs render
+            for x in xs do g.Children.Add(render x) |> ignore
             g :> UIElement
         | Docked (e,d) ->
-            let elt = render prev e
+            let elt = render e
             DockPanel.SetDock(elt,d)
             elt
         | Column (e,d) ->
-            let elt = render prev e
+            let elt = render e
             Grid.SetColumn(elt,d)
             elt
         | Row (e,d) ->
-            let elt = render prev e
+            let elt = render e
             Grid.SetRow(elt,d)
             elt
         | Splitter Vertical ->
-            // check the gs has the same definition
-            let gs = reuse prev <| fun () -> new GridSplitter(VerticalAlignment=VerticalAlignment.Stretch,HorizontalAlignment=HorizontalAlignment.Center,ResizeDirection=GridResizeDirection.Columns,ShowsPreview=true,Width=5.)
+            let gs = new GridSplitter(VerticalAlignment=VerticalAlignment.Stretch,HorizontalAlignment=HorizontalAlignment.Center,ResizeDirection=GridResizeDirection.Columns,ShowsPreview=true,Width=5.)
             gs :> UIElement
         | Splitter Horizontal ->
-            let gs = reuse prev <| fun () -> new GridSplitter(VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Stretch,ResizeDirection=GridResizeDirection.Rows,ShowsPreview=true,Height=5.)
+            let gs = new GridSplitter(VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Stretch,ResizeDirection=GridResizeDirection.Rows,ShowsPreview=true,Height=5.)
             gs :> UIElement
         | Tree xs ->
             let t = new TreeView()
-            for x in xs do t.Items.Add(render null x) |> ignore
+            for x in xs do t.Items.Add(render x) |> ignore
             t :> UIElement
         | TreeItem (title,xs) ->
             let ti = new TreeViewItem()
             ti.Header <- title
-            for x in xs do ti.Items.Add(render null x) |> ignore
+            for x in xs do ti.Items.Add(render x) |> ignore
             ti :> UIElement
         | Editor (doc,pos) ->
-            let editor = new TextEditor()
-            editor.CaretOffset <- pos
-            editor.Document <- doc
-            editor.SyntaxHighlighting <- haskellSyntax
+            let editor = new TextEditor();
+//            let content = IO.File.ReadAllText(path)
+//            let doc = new ICSharpCode.AvalonEdit.Document.TextDocument(content);
+            editor.Document <- doc;
+            editor.SyntaxHighlighting <- haskellSyntax;
             editor :> UIElement
         | other -> failwith "not handled"
+
+let collToList (coll:UIElementCollection) : UIElement list =
+    seq { for c in coll -> c } |> Seq.toList
+
+let itemsToList (coll:ItemCollection) =
+    seq { for c in coll -> c :?> UIElement } |> Seq.toList
+
+let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) : UIElement list = 
+    if prev = curr then screen 
+    else 
+        match (prev,curr,screen) with
+            | (x::xs,y::ys,z::zs) when x = y -> z::resolve xs ys zs
+            | ((Tab aa)::xs,(Tab bb)::ys,z::zs) -> 
+                let a = List.map (fun (_,e,_) -> e) aa
+                let b = List.map (fun (_,e,_) -> e) bb
+                let tab = z :?> TabControl     
+                let childrens = (itemsToList tab.Items)
+                tab.Items.Clear()
+                for c in resolve a b childrens do tab.Items.Add(c) |> ignore
+                (tab :> UIElement)::resolve xs ys zs
+            | ((Dock a)::xs,(Dock b)::ys,z::zs) -> 
+                let dock = z :?> DockPanel     
+                let childrens = (collToList dock.Children)
+                dock.Children.Clear()
+                for c in resolve a b childrens do dock.Children.Add(c) |> ignore
+                (dock :> UIElement)::resolve xs ys zs
+            | ((Column (a,pa))::xs,(Column (b,pb))::ys,z::zs) when pa = pb -> resolve [a] [b] [z] @ resolve xs ys zs
+            | ((Row (a,pa))::xs,(Row (b,pb))::ys,z::zs) when pa = pb -> resolve [a] [b] [z] @ resolve xs ys zs
+            | ((Grid (acols,arows,a))::xs,(Grid (bcols,brows,b))::ys,z::zs) when acols = bcols && arows = brows -> 
+                let grid = z :?> Grid     
+                let childrens = (collToList grid.Children)
+                grid.Children.Clear()
+                for c in resolve a b childrens do grid.Children.Add(c) |> ignore
+                (grid :> UIElement)::resolve xs ys zs
+            | ((Editor (tda,pa))::xs,(Editor (tdb,pb))::ys,z::zs) when tda = tdb -> 
+                z::resolve xs ys zs
+            | ([],y::ys,[]) -> (render y)::resolve [] ys []
+            | ([],[],[]) -> []
+            | (_,y::ys,_) -> 
+                printfn "unable to reuse from %A" y
+                (render y)::resolve [] ys []
+            | other -> failwith <| sprintf "not handled:\n%A" other
     
 
 let w =  new Window(Title="F# is fun!",Width=260., Height=420., Topmost = true)
 
 w.Show()
-w.Content <- render null <| ui {openFiles=[]}        
-
+w.Content <- List.head <| resolve [] [ui {openFiles=[]}] [] 
 
 messages.Scan({openFiles=[]},
             fun state cmd ->
@@ -218,15 +253,16 @@ messages.Scan({openFiles=[]},
                     let unselect = state.openFiles |> List.map( fun (a,b,c,_) -> (a,b,c,false) ) 
                     let content = IO.File.ReadAllText(s)
                     let doc = new ICSharpCode.AvalonEdit.Document.TextDocument(content)
-                    {state with openFiles=("file 1",doc,0,true)::unselect }      
+                    {state with openFiles=unselect@[("file 1",doc,0,true)] }      
                 | other -> state  )
         .Scan((ui {openFiles=[]},ui {openFiles=[]}), fun (prevdom,newdom) state -> (newdom,ui state) )
-        .Subscribe(function (p,c) -> w.Content <- render w.Content c  )
+        .Subscribe(function (p,c) -> w.Content <- List.head <| resolve [p] [c] [downcast w.Content]  )
 
 
 //        | OpenFile s -> w.Content <- render <| ui {openFiles=[("file 1",s)]}        
 
 
+                
 
 
 

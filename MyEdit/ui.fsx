@@ -16,19 +16,13 @@
 open System
 open System.Windows          
 open System.Windows.Controls  
-open System.Windows.Media
-open System.Windows.Shapes
-open System.Reactive
 open System.Reactive.Linq
-open FSharpx
-open System.Windows.Data
 open ICSharpCode.AvalonEdit
 open Simple.Wpf.Terminal
 open System.Xml
 open ICSharpCode.AvalonEdit.Highlighting
 open ICSharpCode.AvalonEdit.Document
 
-//open ReactiveUI
 
 //#region helpers
 type Column = GridLength
@@ -56,7 +50,8 @@ type Element =
     | Tree of Element list
     | TreeItem of Title*Element list
     | Editor of TextDocument*int
-    | Tab of (String*Element*Boolean) list
+    | TabItem of (String*Element*Boolean)
+    | Tab of Element list
 
 
 type EditorState = {
@@ -84,7 +79,7 @@ let saveFile () =
     ()
 
 let ui (state:EditorState) = 
-    let tabs = state.openFiles |> List.map (fun (t,p,pos,selected) -> (t,Editor (p,pos),selected ) )
+    let tabs = state.openFiles |> List.map (fun (t,p,pos,selected) -> TabItem (t,Editor (p,pos),selected ) )
     Dock [Docked(Menu [MenuItem ("File",
                         [
                         MenuItem ("Open file",[], [BrowseFile] )
@@ -107,29 +102,6 @@ let haskellSyntax =
     use reader = new XmlTextReader(System.IO.Path.Combine( __SOURCE_DIRECTORY__ ,@"Syntax\FS-Mode.xshd"))
     ICSharpCode.AvalonEdit.Highlighting.Xshd.HighlightingLoader.Load(reader, HighlightingManager.Instance);
 
-let reuse (prev:obj) fact = 
-    if prev <> null && prev :? 'a then 
-        printfn "reusing %A" prev
-        downcast prev
-    else 
-        printfn "not reusing %A because need %A" prev typeof<'a>
-        fact()
-
-let reuseChildrens d (childrens:UIElementCollection) xs render =
-    if childrens.Count = List.length xs then 
-        let _childrens = seq {for c in childrens -> c} |> Seq.toList
-        for (x,child) in (Seq.zip xs _childrens) do 
-            let rendered = render child x
-            if(rendered <> child) then 
-                let pos = childrens.IndexOf(child)
-                childrens.Remove(child)
-                childrens.Insert(pos,rendered) |> ignore
-                printfn "%A Child %A NOT reused" d child
-            else printfn "%A Child %A reused" d child
-    else 
-        childrens.Clear()
-        for x in xs do childrens.Add (render null x) |> ignore
-
 let rec render ui : UIElement = 
     match ui with
         | Dock xs -> 
@@ -137,14 +109,16 @@ let rec render ui : UIElement =
             for x in xs do d.Children.Add (render x) |> ignore
             d :> UIElement
         | Terminal -> new Terminal() :> UIElement
-        | Tab xs ->
-            let t = new TabControl()
-            for (title,e,b) in xs do
-                let ti = new TabItem()
-                ti.Content <- render e
-                ti.Header <- title
-                t.Items.Add(ti) |> ignore
-            t :> UIElement
+        | Tab xs -> 
+            let d = new TabControl()
+            for x in xs do d.Items.Add (render x) |> ignore
+            d :> UIElement
+        | TabItem (title,e,b) ->
+            let ti = new TabItem()
+            ti.Content <- render e
+            ti.Header <- title
+            ti.IsSelected <- true
+            ti :> UIElement
         | Menu xs ->
             let m = new Menu()
             for x in xs do m.Items.Add (render x) |> ignore
@@ -191,10 +165,9 @@ let rec render ui : UIElement =
             ti :> UIElement
         | Editor (doc,pos) ->
             let editor = new TextEditor();
-//            let content = IO.File.ReadAllText(path)
-//            let doc = new ICSharpCode.AvalonEdit.Document.TextDocument(content);
             editor.Document <- doc;
             editor.SyntaxHighlighting <- haskellSyntax;
+            editor.IsReadOnly <- false;
             editor :> UIElement
         | other -> failwith "not handled"
 
@@ -209,9 +182,7 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
     else 
         match (prev,curr,screen) with
             | (x::xs,y::ys,z::zs) when x = y -> z::resolve xs ys zs
-            | ((Tab aa)::xs,(Tab bb)::ys,z::zs) -> 
-                let a = List.map (fun (_,e,_) -> e) aa
-                let b = List.map (fun (_,e,_) -> e) bb
+            | ((Tab a)::xs,(Tab b)::ys,z::zs) -> 
                 let tab = z :?> TabControl     
                 let childrens = (itemsToList tab.Items)
                 tab.Items.Clear()
@@ -250,16 +221,14 @@ messages.Scan({openFiles=[]},
             fun state cmd ->
                 match cmd with 
                 | OpenFile s ->
-                    let unselect = state.openFiles |> List.map( fun (a,b,c,_) -> (a,b,c,false) ) 
                     let content = IO.File.ReadAllText(s)
                     let doc = new ICSharpCode.AvalonEdit.Document.TextDocument(content)
-                    {state with openFiles=unselect@[("file 1",doc,0,true)] }      
+                    {state with openFiles=state.openFiles@[(IO.Path.GetFileName(s),doc,0,true)] }      
                 | other -> state  )
         .Scan((ui {openFiles=[]},ui {openFiles=[]}), fun (prevdom,newdom) state -> (newdom,ui state) )
         .Subscribe(function (p,c) -> w.Content <- List.head <| resolve [p] [c] [downcast w.Content]  )
 
 
-//        | OpenFile s -> w.Content <- render <| ui {openFiles=[("file 1",s)]}        
 
 
                 

@@ -64,6 +64,93 @@ let ui (state:EditorState) =
 
 Compare this to the hundred of xaml code !
 
+```xaml
+<Window x:Class="MyEdit.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:t="clr-namespace:Simple.Wpf.Terminal;assembly=Simple.Wpf.Terminal"
+        xmlns:i="http://schemas.microsoft.com/expression/2010/interactivity"
+        Title="MainWindow" Height="350" Width="525" WindowStyle="ToolWindow" WindowState="Maximized">
+    <DockPanel LastChildFill="True" Background="{StaticResource BackgroundKey}" >
+        <Menu DockPanel.Dock="Top" >
+            <MenuItem Header="_File">
+                <MenuItem Header="_Open" Command="{Binding Path=OpenFile, Mode=OneWay}"/>
+                <MenuItem Header="_Open Folder" Command="{Binding Path=OpenFolder, Mode=OneWay}"/>
+                <MenuItem Header="_Close"/>
+                <MenuItem Header="_Save"/>
+            </MenuItem>            
+        </Menu>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" ></ColumnDefinition>
+                <ColumnDefinition Width="5" ></ColumnDefinition>
+                <ColumnDefinition  Width="2*"></ColumnDefinition>
+            </Grid.ColumnDefinitions>
+            <TreeView Grid.Column="0" Name="trvMenu" ItemsSource="{Binding Tree}">
+                <TreeView.ItemTemplate>
+                    <HierarchicalDataTemplate DataType="{x:Type MenuItem}" ItemsSource="{Binding Items}">
+                        <TextBlock Text="{Binding Title}" />
+                    </HierarchicalDataTemplate>
+                </TreeView.ItemTemplate>
+                <i:Interaction.Triggers>
+                    <i:EventTrigger EventName="SelectedItemChanged">
+                        <i:InvokeCommandAction Command="{Binding TreeviewSelectedItemChanged}" 
+                                               CommandParameter="{Binding ElementName=trvMenu, Path=SelectedItem}"/>
+                    </i:EventTrigger>
+                </i:Interaction.Triggers>
+            </TreeView>
+            <GridSplitter 
+                        Grid.Column="1" 
+                        VerticalAlignment="Stretch" 
+                        HorizontalAlignment="Center" 
+                        ResizeDirection="Columns"
+                        ShowsPreview="True"  Width="5"  Cursor="SizeWE"   />
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="5" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TabControl ItemsSource="{Binding PageModels, Mode=TwoWay}">
+                    <TabControl.ItemContainerStyle>
+                        <Style TargetType="TabItem">
+                            <Setter Property="Header" Value="{Binding TabCaption, Mode=TwoWay}"/>
+                            <Setter Property="Content" Value="{Binding TabContent}"/>
+                            <Setter Property="IsSelected" Value="{Binding IsSelected}"/>
+                        </Style>
+                    </TabControl.ItemContainerStyle>
+                </TabControl>
+                <GridSplitter 
+                        Grid.ColumnSpan="1"
+                        Grid.Row="1" 
+                        VerticalAlignment="Center" 
+                        HorizontalAlignment="Stretch" 
+                        ResizeDirection="Rows"
+                        ShowsPreview="True"  Height="5"  Cursor="SizeNS"   />
+                <t:Terminal Grid.Row="2" Grid.Column="0" x:Name="TerminalOutput"
+                    IsReadOnlyCaretVisible="False"
+                    VerticalScrollBarVisibility="Visible"
+                    IsReadOnly="false"
+                    FontFamily="Consolas"
+                    Prompt=">"
+                    ItemsSource="{Binding Path=Items, Mode=OneWay}">
+
+                    <i:Interaction.Triggers>
+                        <i:EventTrigger EventName="LineEntered">
+                            <i:InvokeCommandAction Command="{Binding Path=ExecuteItemCommand, Mode=OneWay}"
+                                           CommandParameter="{Binding Path=Line, Mode=OneWay, ElementName=TerminalOutput}" />
+                        </i:EventTrigger>
+                    </i:Interaction.Triggers>
+                </t:Terminal>
+            </Grid>
+        </Grid>
+    </DockPanel>
+</Window>
+```
+
 ## Version 3
 
 * Added ability to save file

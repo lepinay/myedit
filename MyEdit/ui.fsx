@@ -142,7 +142,7 @@ let ui (state:EditorState) =
                             [
                                 Row(Tab tabs,0)
                                 Row(Splitter Horizontal,1)
-//                                Row(Terminal,2)
+                                Row(Terminal,2)
                             ]),2)
                 ])
     ]

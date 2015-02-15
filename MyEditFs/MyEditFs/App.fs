@@ -34,6 +34,7 @@ type Command =
     | OpenFile of string
     | TextChanged of TextDocument
     | CommandOutput of string
+    | DocSelected of string
 
 type Element = 
     | Docked of Element*Dock
@@ -48,16 +49,21 @@ type Element =
     | Tree of Element list
     | TreeItem of Title*Element list
     | Editor of TextDocument
-    | TabItem of (String*Element)
+    | TabItem of (String*Element*Command)
     | TextArea of string
     | Tab of Element list
     | Scroll of Element
 
+type Directory = 
+    | None
+    | Directory of string*Directory list*string list
 
 type EditorState = {
     openFiles:(string*TextDocument) list
+    current:string
     watches : (string) list
     consoleOutput : string
+    currentFolder: Directory
 }
 
 
@@ -81,15 +87,25 @@ let saveFile () =
     debug "save a file"
     ()
 
+// We could optimize this by diffing the state to the previous state and generate only the updated dom
+// like we already do for the Dom to WPF transformation
 let ui (state:EditorState) = 
-    let tabs = state.openFiles |> List.map (fun (t,p) -> TabItem (t,Editor p ) )
+    let tabs = state.openFiles |> List.map (fun (t,p) -> TabItem (IO.Path.GetFileName(t),Editor p, DocSelected t) )
+    let rec makeTree = function
+        | None -> []
+        | Directory (p, folders, files) -> 
+            let filest = List.map( fun f -> TreeItem(f,[])) files
+            let folderst = List.map makeTree folders |> List.concat
+            [TreeItem(p,  folderst @ filest )]
+
+    let tree = Tree <| makeTree state.currentFolder
     Dock [Docked(Menu [MenuItem ("File",
                         [
                         MenuItem ("Open file",[], [BrowseFile] )
                         MenuItem ("Open folder",[], [BrowseFolder])
                         MenuItem ("Save",[], [SaveFile])], [])],Dock.Top)
           Grid ([GridLength(1.,GridUnitType.Star);GridLength(5.);GridLength(2.,GridUnitType.Star)],[],[
-                    Column(Tree [TreeItem("Code",[TreeItem("HelloWorld",[])])] ,0)
+                    Column(tree,0)
                     Column(Splitter Vertical,1)
                     Column(
                         Grid ([GridLength(1.,GridUnitType.Star)],
@@ -114,14 +130,20 @@ let rec render ui : UIElement =
             d :> UIElement
         | Terminal -> new Terminal() :> UIElement
         | Tab xs -> 
-            let d = new TabControl()
+            let d = new TabControl()            
             for x in xs do d.Items.Add (render x) |> ignore
+            d.SelectionChanged |> Observable.subscribe(fun e -> 
+                let item = d.SelectedItem :?> TabItem
+                if item <> null then
+                    let tag = item.Tag :?> Command
+                    messages.OnNext tag |> ignore) |> ignore
             d :> UIElement
-        | TabItem (title,e) ->
+        | TabItem (title,e,com) ->
             let ti = new TabItem()
             ti.Content <- render e
             ti.Header <- title
             ti.IsSelected <- true
+            ti.Tag <- com
             ti :> UIElement
         | Menu xs ->
             let m = new Menu()
@@ -198,7 +220,7 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
     else 
         match (prev,curr,screen) with
             | (x::xs,y::ys,z::zs) when x = y -> z::resolve xs ys zs
-            | ((TabItem (ta,ea))::xs,(TabItem (tb,eb))::ys,z::zs) when ea = eb -> 
+            | ((TabItem (ta,ea,coma))::xs,(TabItem (tb,eb,comb))::ys,z::zs) when ea = eb -> 
                 let ti = z :?> TabItem
                 ti.Header <- tb
                 ti.IsSelected <- true
@@ -244,7 +266,13 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
             | other -> failwith <| sprintf "not handled:\n%A" other
 
 // elm-make main.elm --yes
-let intialState = {openFiles=[];watches=[("cd C:\Users\Laurent\Documents\code\like; elm-make main.elm --yes")];consoleOutput=""}
+let intialState = {
+    openFiles=[]
+    watches=[("cd C:\Users\Laurent\Documents\code\like; elm-make main.elm --yes")]
+    consoleOutput=""
+    current=""
+    currentFolder=Directory ("Code", [Directory ("Src", [], ["file1.test";"file2.test"]) ], ["file1";"file2"]) 
+    }
 
 
 let myHost = new MyHost(fun s -> 
@@ -297,13 +325,16 @@ let main argv =
                 | OpenFile s ->
                     let content = IO.File.ReadAllText(s)
                     let doc = new ICSharpCode.AvalonEdit.Document.TextDocument(content)
-                    {state with openFiles=state.openFiles@[(IO.Path.GetFileName(s),doc)] } 
+                    {state with openFiles=state.openFiles@[(s,doc)] } 
                 | SaveFile -> 
                     let unstarize (s:String) = s.Replace("*","")
                     let (t,doc) = List.head state.openFiles
+                    IO.File.WriteAllText(state.current,doc.Text)
                     {state with openFiles= List.map(fun (t,d) -> if d = doc then (unstarize t,d) else (t,d)) state.openFiles }      
                 | CommandOutput s ->
                     {state with consoleOutput = state.consoleOutput+"\n"+s}
+                | DocSelected s ->
+                    {state with current = s}
                 | other -> state  )
         .Scan((ui intialState,ui intialState), fun (prevdom,newdom) state -> (newdom,ui state) )
         .Subscribe(function (p,c) -> w.Content <- List.head <| resolve [p] [c] [downcast w.Content]  )

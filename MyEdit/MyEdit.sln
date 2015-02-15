@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyEdit", "MyEdit.csproj", "{ADB5E48D-8D96-4880-9485-2981CF27CB2E}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{34754D39-1E34-446A-9ACC-9DD81003C987}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MyEditFs", "..\MyEditFs\MyEditFs\MyEditFs.fsproj", "{EB103F18-9C5A-45AC-8563-3070B2ED0E80}"
@@ -21,16 +19,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{ADB5E48D-8D96-4880-9485-2981CF27CB2E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{ADB5E48D-8D96-4880-9485-2981CF27CB2E}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{ADB5E48D-8D96-4880-9485-2981CF27CB2E}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
-		{ADB5E48D-8D96-4880-9485-2981CF27CB2E}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
-		{ADB5E48D-8D96-4880-9485-2981CF27CB2E}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{ADB5E48D-8D96-4880-9485-2981CF27CB2E}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{ADB5E48D-8D96-4880-9485-2981CF27CB2E}.Release|Any CPU.Build.0 = Release|Any CPU
-		{ADB5E48D-8D96-4880-9485-2981CF27CB2E}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
-		{ADB5E48D-8D96-4880-9485-2981CF27CB2E}.Release|Mixed Platforms.Build.0 = Release|Any CPU
-		{ADB5E48D-8D96-4880-9485-2981CF27CB2E}.Release|x86.ActiveCfg = Release|Any CPU
 		{EB103F18-9C5A-45AC-8563-3070B2ED0E80}.Debug|Any CPU.ActiveCfg = Debug|x86
 		{EB103F18-9C5A-45AC-8563-3070B2ED0E80}.Debug|Mixed Platforms.ActiveCfg = Debug|x86
 		{EB103F18-9C5A-45AC-8563-3070B2ED0E80}.Debug|Mixed Platforms.Build.0 = Debug|x86

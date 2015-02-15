@@ -196,6 +196,7 @@ let rec render ui : UIElement =
             editor.FontFamily <- FontFamily("Consolas")
             editor.TextChanged |> Observable.subscribe(fun e -> messages.OnNext(TextChanged doc)  ) |> ignore
             editor.SyntaxHighlighting <- haskellSyntax;
+            editor.ShowLineNumbers <- true
 //            editor.IsReadOnly <- false;
             editor :> UIElement
         | TextArea s -> 

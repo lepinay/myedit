@@ -1,65 +1,7 @@
-﻿#r @"PresentationCore"
-#r @"PresentationFramework"
-#r @"WindowsBase"
-#r @"System.Xaml"
-#r @"UIAutomationTypes"
-#r @"packages\Rx-Core.2.2.5\lib\net45\System.Reactive.Core.dll"
-#r @"packages\Rx-Interfaces.2.2.5\lib\net45\System.Reactive.Interfaces.dll"
-#r @"packages\Rx-Linq.2.2.5\lib\net45\System.Reactive.Linq.dll"
-#r @"packages\FSharpx.TypeProviders.Xaml.1.8.41\lib\40\FSharpx.TypeProviders.Xaml.dll"
-#r @"packages\AvalonEdit.5.0.2\lib\Net40\ICSharpCode.AvalonEdit.dll"
-#r @"packages\Simple.Wpf.Terminal.1.33.0.0\lib\net40\Simple.Wpf.Terminal.dll"
-#r @"packages\Rx-PlatformServices.2.2.5\lib\net45\System.Reactive.PlatformServices.dll"
-#r @"packages\reactiveui-core.6.4.0.1\lib\Net45\ReactiveUI.dll"
-#r @"packages\Splat.1.6.0\lib\Net45\Splat.dll"
+﻿module main
 
-//#I "c:/Program Files/Reference Assemblies/Microsoft/Framework/v3.0"
-//#I "C:/WINDOWS/Microsoft.NET/Framework/v3.0/WPF/"
-//#r "PresentationCore.dll"
-//#r "PresentationFramework.dll"
-//#r "WindowsBase.dll"
-//#r @"System.Xaml"
-
-// #region This is to have wpf keyboqrd input working while running in fsi
-module WPFEventLoop =     
-    open System    
-    open System.Windows    
-    open System.Windows.Threading    
-    open Microsoft.FSharp.Compiler.Interactive    
-    open Microsoft.FSharp.Compiler.Interactive.Settings    
-
-    type RunDelegate<'b> = delegate of unit -> 'b     
-    let Create() =         
-        let app  =             
-            try                 
-                // Ensure the current application exists. This may fail, if it already does.                
-                let app = new Application() in                 
-                // Create a dummy window to act as the main window for the application.                
-                // Because we're in FSI we never want to clean this up.                
-                new Window() |> ignore;                 
-                app              
-            with :? InvalidOperationException -> Application.Current        
-        let disp = app.Dispatcher        
-        let restart = ref false        
-        { new IEventLoop with             
-            member x.Run() =                    
-                app.Run() |> ignore                 
-                !restart             
-
-            member x.Invoke(f) =                  
-                try 
-                    disp.Invoke(DispatcherPriority.Send,new RunDelegate<_>(fun () -> box(f ()))) |> unbox                 
-                with e -> eprintf "\n\n ERROR: %O\n" e; reraise()             
-
-            member x.ScheduleRestart() =   ()                 
-            //restart := true;                 
-            //app.Shutdown()        
-         }     
-
-    let Install() = fsi.EventLoop <-  Create()
-
-WPFEventLoop.Install()
-// #endregion
+open System
+open FsXaml
 
 open System
 open System.Windows          
@@ -71,6 +13,10 @@ open System.Xml
 open ICSharpCode.AvalonEdit.Highlighting
 open ICSharpCode.AvalonEdit.Document
 open System.Windows.Media
+open MyEdit.Powershell
+open System.Management.Automation.Runspaces
+open System.Management.Automation
+open System.Threading.Tasks
 
 
 //#region helpers
@@ -86,6 +32,7 @@ type Command =
     | SaveFile
     | OpenFile of string
     | TextChanged of TextDocument
+    | CommandOutput of string
 
 type Element = 
     | Docked of Element*Dock
@@ -101,15 +48,18 @@ type Element =
     | TreeItem of Title*Element list
     | Editor of TextDocument*int
     | TabItem of (String*Element*Boolean)
+    | TextArea of string
     | Tab of Element list
 
 
 type EditorState = {
     openFiles:(string*TextDocument*int*bool) list
-    watches : string list
+    watches : (string*string) list
+    consoleOutput : string
 }
 
 
+let debug = System.Diagnostics.Debug.WriteLine
 let messages = new Reactive.Subjects.Subject<Command>()
 
 let openFile () = 
@@ -121,12 +71,12 @@ let openFile () =
         messages.OnNext(OpenFile dlg.FileName)
     ()
 
-let openFolder () = 
-    printfn "open a folder"
+let openFolder () =     
+    debug "open a folder"
     ()
 
 let saveFile () = 
-    printfn "save a file"
+    debug "save a file"
     ()
 
 let ui (state:EditorState) = 
@@ -145,13 +95,13 @@ let ui (state:EditorState) =
                             [
                                 Row(Tab tabs,0)
                                 Row(Splitter Horizontal,1)
-                                Row(Terminal,2)
+                                Row(TextArea state.consoleOutput,2)
                             ]),2)
                 ])
     ]
 
 let haskellSyntax = 
-    use reader = new XmlTextReader(System.IO.Path.Combine( __SOURCE_DIRECTORY__ ,@"Syntax\FS-Mode.xshd"))
+    use reader = new XmlTextReader(@"FS-Mode.xshd")
     ICSharpCode.AvalonEdit.Highlighting.Xshd.HighlightingLoader.Load(reader, HighlightingManager.Instance);
 
 let rec render ui : UIElement = 
@@ -224,6 +174,10 @@ let rec render ui : UIElement =
             editor.SyntaxHighlighting <- haskellSyntax;
 //            editor.IsReadOnly <- false;
             editor :> UIElement
+        | TextArea s -> 
+            let tb = new TextBlock()
+            tb.Text <- s
+            tb :> UIElement
         | other -> failwith "not handled"
 
 let collToList (coll:UIElementCollection) : UIElement list =
@@ -265,24 +219,63 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
                 (grid :> UIElement)::resolve xs ys zs
             | ((Editor (tda,pa))::xs,(Editor (tdb,pb))::ys,z::zs) when tda = tdb -> 
                 z::resolve xs ys zs
+            | ((TextArea a)::xs,(TextArea b)::ys,z::zs)  -> 
+                let tb = z :?> TextBlock
+                // Yeah todo, this is highlyt inefficent
+                tb.Text <- b
+                z::resolve xs ys zs
             | ([],y::ys,[]) -> (render y)::resolve [] ys []
             | ([],[],[]) -> []
             | (_,y::ys,_) -> 
-                printfn "unable to reuse from %A" y
+                debug <| sprintf "unable to reuse from %A" y
                 (render y)::resolve [] ys []
             | other -> failwith <| sprintf "not handled:\n%A" other
 
-let intialState = {openFiles=[];watches=["elm-make main.elm --yes"]}
-
-let w =  new Window(Title="F# is fun!",Width=260., Height=420., Topmost = true)
-w.Show()
-w.Content <- List.head <| resolve [] [ui intialState] [] 
-
-let run (cmd:string) = 
-    System.Diagnostics.Process.Start(cmd);
+let intialState = {openFiles=[];watches=[("elm-make", "main.elm --yes")];consoleOutput=""}
 
 
-messages.Scan(intialState,
+let myHost = new MyHost(fun s -> 
+    Application.Current.Dispatcher.InvokeAsync(
+        fun () ->
+            debug s
+            messages.OnNext <| CommandOutput s) |> ignore
+    )
+let myRunSpace = RunspaceFactory.CreateRunspace(myHost);
+myRunSpace.Open();
+let powershell = PowerShell.Create();
+powershell.Runspace <- myRunSpace;
+
+let run (cmd:string,args:string) = 
+//    let pi = new Diagnostics.ProcessStartInfo(cmd,args)
+//    pi.WindowStyle <- Diagnostics.ProcessWindowStyle.Hidden
+//    pi.RedirectStandardError <- true
+//    pi.RedirectStandardOutput <- true    
+//    pi.UseShellExecute <- false
+//    pi.CreateNoWindow <- false
+//    let p = Diagnostics.Process.Start(pi);
+//    p.ErrorDataReceived |> Observable.subscribe(fun e -> debug e.Data ) |> ignore
+//    p.OutputDataReceived |> Observable.subscribe(fun e -> debug e.Data )
+        let script = @"ls c:\"
+        powershell.AddScript(script) |> ignore
+        powershell.AddCommand("out-default") |> ignore
+        powershell.Invoke() |> ignore
+
+
+
+
+
+//type App = XAML<"App.xaml">
+
+[<STAThread>]
+[<EntryPoint>]
+let main argv =
+    
+
+    let w =  new Window(Title="F# is fun!",Width=260., Height=420.)
+    w.Show()
+    w.Content <- List.head <| resolve [] [ui intialState] [] 
+
+    messages.Scan(intialState,
             fun state cmd ->
                 match cmd with 
                 | TextChanged doc ->
@@ -294,23 +287,18 @@ messages.Scan(intialState,
                     let doc = new ICSharpCode.AvalonEdit.Document.TextDocument(content)
                     {state with openFiles=state.openFiles@[(IO.Path.GetFileName(s),doc,0,true)] } 
                 | SaveFile -> 
-                    printfn "save"
+                    debug "save"
                     let unstarize (s:String) = s.Replace("*","")
                     let (t,doc,p,b) = List.head state.openFiles
                     {state with openFiles= List.map(fun (t,d,p,b) -> if d = doc then (unstarize t,d,p,b) else (t,d,p,b)) state.openFiles }      
+                | CommandOutput s ->
+                    {state with consoleOutput = state.consoleOutput+"\n"+s}
                 | other -> state  )
         .Scan((ui intialState,ui intialState), fun (prevdom,newdom) state -> (newdom,ui state) )
         .Subscribe(function (p,c) -> w.Content <- List.head <| resolve [p] [c] [downcast w.Content]  )
+        |>ignore
 
 
-
-
-                
-
-
-
-
-
-
-
-
+    let app = new Application()
+    app.Run(w)
+//    App().Root.Run()

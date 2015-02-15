@@ -17,6 +17,7 @@ open MyEdit.Powershell
 open System.Management.Automation.Runspaces
 open System.Management.Automation
 open System.Threading.Tasks
+open System.Reactive.Concurrency
 
 
 //#region helpers
@@ -50,11 +51,12 @@ type Element =
     | TabItem of (String*Element*Boolean)
     | TextArea of string
     | Tab of Element list
+    | Scroll of Element
 
 
 type EditorState = {
     openFiles:(string*TextDocument*int*bool) list
-    watches : (string*string) list
+    watches : (string) list
     consoleOutput : string
 }
 
@@ -95,7 +97,7 @@ let ui (state:EditorState) =
                             [
                                 Row(Tab tabs,0)
                                 Row(Splitter Horizontal,1)
-                                Row(TextArea state.consoleOutput,2)
+                                Row(Scroll(TextArea state.consoleOutput),2)
                             ]),2)
                 ])
     ]
@@ -177,7 +179,12 @@ let rec render ui : UIElement =
         | TextArea s -> 
             let tb = new TextBlock()
             tb.Text <- s
+            tb.FontFamily <- FontFamily("Consolas")
             tb :> UIElement
+        | Scroll e ->
+            let scroll = new ScrollViewer()
+            scroll.Content <- render e
+            scroll :> UIElement
         | other -> failwith "not handled"
 
 let collToList (coll:UIElementCollection) : UIElement list =
@@ -219,6 +226,11 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
                 (grid :> UIElement)::resolve xs ys zs
             | ((Editor (tda,pa))::xs,(Editor (tdb,pb))::ys,z::zs) when tda = tdb -> 
                 z::resolve xs ys zs
+            | ((Scroll a)::xs,(Scroll b)::ys,z::zs) -> 
+                let scroll = z :?> ScrollViewer
+                scroll.Content <- List.head <| resolve [a] [b] [scroll.Content :?> UIElement]
+                scroll.ScrollToBottom()
+                (scroll:>UIElement)::resolve xs ys zs
             | ((TextArea a)::xs,(TextArea b)::ys,z::zs)  -> 
                 let tb = z :?> TextBlock
                 // Yeah todo, this is highlyt inefficent
@@ -227,11 +239,12 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
             | ([],y::ys,[]) -> (render y)::resolve [] ys []
             | ([],[],[]) -> []
             | (_,y::ys,_) -> 
-                debug <| sprintf "unable to reuse from %A" y
+                failwith <| sprintf "unable to reuse from %A" y
                 (render y)::resolve [] ys []
             | other -> failwith <| sprintf "not handled:\n%A" other
 
-let intialState = {openFiles=[];watches=[("elm-make", "main.elm --yes")];consoleOutput=""}
+// elm-make main.elm --yes
+let intialState = {openFiles=[];watches=[("cd C:\Users\Laurent\Documents\code\like; elm-make main.elm --yes")];consoleOutput=""}
 
 
 let myHost = new MyHost(fun s -> 
@@ -242,23 +255,17 @@ let myHost = new MyHost(fun s ->
     )
 let myRunSpace = RunspaceFactory.CreateRunspace(myHost);
 myRunSpace.Open();
-let powershell = PowerShell.Create();
-powershell.Runspace <- myRunSpace;
 
-let run (cmd:string,args:string) = 
-//    let pi = new Diagnostics.ProcessStartInfo(cmd,args)
-//    pi.WindowStyle <- Diagnostics.ProcessWindowStyle.Hidden
-//    pi.RedirectStandardError <- true
-//    pi.RedirectStandardOutput <- true    
-//    pi.UseShellExecute <- false
-//    pi.CreateNoWindow <- false
-//    let p = Diagnostics.Process.Start(pi);
-//    p.ErrorDataReceived |> Observable.subscribe(fun e -> debug e.Data ) |> ignore
-//    p.OutputDataReceived |> Observable.subscribe(fun e -> debug e.Data )
-        let script = @"ls c:\"
-        powershell.AddScript(script) |> ignore
-        powershell.AddCommand("out-default") |> ignore
-        powershell.Invoke() |> ignore
+let run (script:string) = 
+    Task.Run 
+        (fun () ->
+            use powershell = PowerShell.Create();
+            powershell.Runspace <- myRunSpace;
+            powershell.AddScript(script) |> ignore
+            powershell.AddCommand("out-default") |> ignore
+            powershell.Commands.Commands.[0].MergeMyResults(PipelineResultTypes.Error, PipelineResultTypes.Output);
+            powershell.Invoke()
+            )
 
 
 
@@ -275,7 +282,12 @@ let main argv =
     w.Show()
     w.Content <- List.head <| resolve [] [ui intialState] [] 
 
-    messages.Scan(intialState,
+    let textChanged = messages.Where(function | TextChanged _ -> true | _ -> false).Throttle(TimeSpan.FromSeconds(2.),DispatcherScheduler.Current)
+    //let commandOutputs = messages.Where(function | CommandOutput s -> true | _ -> false).Buffer(TimeSpan.FromSeconds(2.),DispatcherScheduler.Current).Select(fun b -> CommandOutputBuffered b )
+    let optMessages = messages.Where(function | TextChanged _ -> false | _ -> true).Merge(textChanged)
+
+    optMessages
+        .Scan(intialState,
             fun state cmd ->
                 match cmd with 
                 | TextChanged doc ->

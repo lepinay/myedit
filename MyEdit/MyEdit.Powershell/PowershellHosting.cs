@@ -366,7 +366,7 @@ namespace MyEdit.Powershell
 
         public override void WriteErrorLine(string value)
         {
-            throw new NotImplementedException();
+            output(value);
         }
 
         public override void WriteLine(string value)

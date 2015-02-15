@@ -82,7 +82,7 @@ type SplitterDirection = Horizontal | Vertical
 type Command =
     | BrowseFile
     | BrowseFolder
-    | SaveFile of string
+    | SaveFile
     | OpenFile of string
     | TextChanged of TextDocument
 
@@ -133,7 +133,7 @@ let ui (state:EditorState) =
                         [
                         MenuItem ("Open file",[], [BrowseFile] )
                         MenuItem ("Open folder",[], [BrowseFolder])
-                        MenuItem ("Save",[], [SaveFile ""])], [])],Dock.Top)
+                        MenuItem ("Save",[], [SaveFile])], [])],Dock.Top)
           Grid ([GridLength(1.,GridUnitType.Star);GridLength(5.);GridLength(2.,GridUnitType.Star)],[],[
                     Column(Tree [TreeItem("Code",[TreeItem("HelloWorld",[])])] ,0)
                     Column(Splitter Vertical,1)
@@ -177,6 +177,7 @@ let rec render ui : UIElement =
             for x in xs do mi.Items.Add(render x) |> ignore
             match actions with 
                 | [BrowseFile] -> mi.Click |> Observable.subscribe(fun e -> openFile()) |> ignore
+                | [SaveFile] -> mi.Click |> Observable.subscribe(fun e -> messages.OnNext(SaveFile)) |> ignore
                 | other -> ()
             mi :> UIElement
         | Grid (cols,rows,xs) ->
@@ -232,7 +233,7 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
     else 
         match (prev,curr,screen) with
             | (x::xs,y::ys,z::zs) when x = y -> z::resolve xs ys zs
-            | ((TabItem (ta,ea,ba))::xs,(TabItem (tb,eb,bb))::ys,z::zs) when tb.EndsWith("*") -> 
+            | ((TabItem (ta,ea,ba))::xs,(TabItem (tb,eb,bb))::ys,z::zs) when ea = eb -> 
                 let ti = z :?> TabItem
                 ti.Header <- tb
                 ti.IsSelected <- true
@@ -266,11 +267,6 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
                 printfn "unable to reuse from %A" y
                 (render y)::resolve [] ys []
             | other -> failwith <| sprintf "not handled:\n%A" other
-    
-
-
-
-
 
 let w =  new Window(Title="F# is fun!",Width=260., Height=420., Topmost = true)
 w.Show()
@@ -285,7 +281,12 @@ messages.Scan({openFiles=[]},
                 | OpenFile s ->
                     let content = IO.File.ReadAllText(s)
                     let doc = new ICSharpCode.AvalonEdit.Document.TextDocument(content)
-                    {state with openFiles=state.openFiles@[(IO.Path.GetFileName(s),doc,0,true)] }      
+                    {state with openFiles=state.openFiles@[(IO.Path.GetFileName(s),doc,0,true)] } 
+                | SaveFile -> 
+                    printfn "save"
+                    let unstarize (s:String) = s.Replace("*","")
+                    let (t,doc,p,b) = List.head state.openFiles
+                    {state with openFiles= List.map(fun (t,d,p,b) -> if d = doc then (unstarize t,d,p,b) else (t,d,p,b)) state.openFiles }      
                 | other -> state  )
         .Scan((ui {openFiles=[]},ui {openFiles=[]}), fun (prevdom,newdom) state -> (newdom,ui state) )
         .Subscribe(function (p,c) -> w.Content <- List.head <| resolve [p] [c] [downcast w.Content]  )

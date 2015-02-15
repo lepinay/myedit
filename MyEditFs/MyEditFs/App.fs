@@ -47,15 +47,15 @@ type Element =
     | Terminal
     | Tree of Element list
     | TreeItem of Title*Element list
-    | Editor of TextDocument*int
-    | TabItem of (String*Element*Boolean)
+    | Editor of TextDocument
+    | TabItem of (String*Element)
     | TextArea of string
     | Tab of Element list
     | Scroll of Element
 
 
 type EditorState = {
-    openFiles:(string*TextDocument*int*bool) list
+    openFiles:(string*TextDocument) list
     watches : (string) list
     consoleOutput : string
 }
@@ -82,7 +82,7 @@ let saveFile () =
     ()
 
 let ui (state:EditorState) = 
-    let tabs = state.openFiles |> List.map (fun (t,p,pos,selected) -> TabItem (t,Editor (p,pos),selected ) )
+    let tabs = state.openFiles |> List.map (fun (t,p) -> TabItem (t,Editor p ) )
     Dock [Docked(Menu [MenuItem ("File",
                         [
                         MenuItem ("Open file",[], [BrowseFile] )
@@ -117,7 +117,7 @@ let rec render ui : UIElement =
             let d = new TabControl()
             for x in xs do d.Items.Add (render x) |> ignore
             d :> UIElement
-        | TabItem (title,e,b) ->
+        | TabItem (title,e) ->
             let ti = new TabItem()
             ti.Content <- render e
             ti.Header <- title
@@ -168,7 +168,7 @@ let rec render ui : UIElement =
             ti.Header <- title
             for x in xs do ti.Items.Add(render x) |> ignore
             ti :> UIElement
-        | Editor (doc,pos) ->
+        | Editor doc ->
             let editor = new TextEditor();
             editor.Document <- doc;
             editor.FontFamily <- FontFamily("Consolas")
@@ -198,7 +198,7 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
     else 
         match (prev,curr,screen) with
             | (x::xs,y::ys,z::zs) when x = y -> z::resolve xs ys zs
-            | ((TabItem (ta,ea,ba))::xs,(TabItem (tb,eb,bb))::ys,z::zs) when ea = eb -> 
+            | ((TabItem (ta,ea))::xs,(TabItem (tb,eb))::ys,z::zs) when ea = eb -> 
                 let ti = z :?> TabItem
                 ti.Header <- tb
                 ti.IsSelected <- true
@@ -224,7 +224,7 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
                 grid.Children.Clear()
                 for c in resolve a b childrens do grid.Children.Add(c) |> ignore
                 (grid :> UIElement)::resolve xs ys zs
-            | ((Editor (tda,pa))::xs,(Editor (tdb,pb))::ys,z::zs) when tda = tdb -> 
+            | ((Editor tda)::xs,(Editor tdb)::ys,z::zs) when tda = tdb -> 
                 z::resolve xs ys zs
             | ((Scroll a)::xs,(Scroll b)::ys,z::zs) -> 
                 let scroll = z :?> ScrollViewer
@@ -293,16 +293,15 @@ let main argv =
                 | TextChanged doc ->
                     let starize (t:String) = if t.EndsWith("*") then t else t+"*"
                     for cmd in state.watches do run cmd |> ignore
-                    {state with openFiles= List.map(fun (t,d,p,b) -> if d = doc then (starize t,d,p,b) else (t,d,p,b)) state.openFiles }      
+                    {state with openFiles= List.map(fun (t,d) -> if d = doc then (starize t,d) else (t,d)) state.openFiles }      
                 | OpenFile s ->
                     let content = IO.File.ReadAllText(s)
                     let doc = new ICSharpCode.AvalonEdit.Document.TextDocument(content)
-                    {state with openFiles=state.openFiles@[(IO.Path.GetFileName(s),doc,0,true)] } 
+                    {state with openFiles=state.openFiles@[(IO.Path.GetFileName(s),doc)] } 
                 | SaveFile -> 
-                    debug "save"
                     let unstarize (s:String) = s.Replace("*","")
-                    let (t,doc,p,b) = List.head state.openFiles
-                    {state with openFiles= List.map(fun (t,d,p,b) -> if d = doc then (unstarize t,d,p,b) else (t,d,p,b)) state.openFiles }      
+                    let (t,doc) = List.head state.openFiles
+                    {state with openFiles= List.map(fun (t,d) -> if d = doc then (unstarize t,d) else (t,d)) state.openFiles }      
                 | CommandOutput s ->
                     {state with consoleOutput = state.consoleOutput+"\n"+s}
                 | other -> state  )

@@ -21,6 +21,18 @@ Why am I writing my own code editor ?
 
 This is where we have a fun and see how the baby is growing :smiley:
 
+## Version 5
+
+Monokai theme (Elm only, hard coded)
+Elm syntax 
+Build on save (Hard coded)
+
+Folder browser is broken, will fix in next version
+
+![shot](/Versions/5.png) 
+
+I've now reached the point where I should be able to start using this thing and write some code :smiley:
+
 ## Version 4
 
 Mainly a lot of refactoring, I've replaced most of the c# code to f# code.

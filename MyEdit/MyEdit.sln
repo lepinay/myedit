@@ -6,6 +6,7 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{34754D39-1E34-446A-9ACC-9DD81003C987}"
 	ProjectSection(SolutionItems) = preProject
 		AvalonEdit.xsd = AvalonEdit.xsd
+		..\README.md = ..\README.md
 	EndProjectSection
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MyEditFs", "..\MyEditFs\MyEditFs\MyEditFs.fsproj", "{EB103F18-9C5A-45AC-8563-3070B2ED0E80}"

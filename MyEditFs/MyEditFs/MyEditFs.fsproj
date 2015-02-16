@@ -54,9 +54,13 @@
     <Compile Include="App.fs" />
     <Content Include="App.config" />
     <Content Include="packages.config" />
+    <None Include="Elm-Mode.xshd">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Include="FS-Mode.xshd">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <Content Include="WP-Fx_License.txt" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Accessibility" />
@@ -124,6 +128,7 @@
       <HintPath>..\..\MyEdit\packages\Rx-XAML.2.2.5\lib\net45\System.Reactive.Windows.Threading.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="System.Windows" />
     <Reference Include="System.Windows.Interactivity">
       <HintPath>..\..\MyEdit\packages\Expression.Blend.Sdk.1.0.2\lib\net45\System.Windows.Interactivity.dll</HintPath>
       <Private>True</Private>
@@ -133,6 +138,14 @@
     <Reference Include="UIAutomationProvider" />
     <Reference Include="UIAutomationTypes" />
     <Reference Include="WindowsBase" />
+    <Reference Include="WP-Fx.Core">
+      <HintPath>..\..\MyEdit\packages\WP-Fx.UI.1.0.0\lib\WP-Fx.Core.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="WP-Fx.UI">
+      <HintPath>..\..\MyEdit\packages\WP-Fx.UI.1.0.0\lib\WP-Fx.UI.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\MyEdit\MyEdit.Powershell\MyEdit.Powershell.csproj">

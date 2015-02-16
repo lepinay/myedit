@@ -18,6 +18,7 @@ open System.Management.Automation.Runspaces
 open System.Management.Automation
 open System.Threading.Tasks
 open System.Reactive.Concurrency
+open System.Windows.Input
 
 
 //#region helpers
@@ -42,7 +43,7 @@ type Element =
     | Row of Element*int
     | Dock of Element list
     | Menu of Element list
-    | MenuItem of Title*Element list*Command list
+    | MenuItem of Title*Element list*Command list*String
     | Grid of Column list*Row list*Element list
     | Splitter of SplitterDirection
     | Terminal
@@ -101,9 +102,9 @@ let ui (state:EditorState) =
     let tree = Tree <| makeTree state.currentFolder
     Dock [Docked(Menu [MenuItem ("File",
                         [
-                        MenuItem ("Open file",[], [BrowseFile] )
-                        MenuItem ("Open folder",[], [BrowseFolder])
-                        MenuItem ("Save",[], [SaveFile])], [])],Dock.Top)
+                        MenuItem ("Open file",[], [BrowseFile], "" )
+                        MenuItem ("Open folder",[], [BrowseFolder], "")
+                        MenuItem ("Save",[], [SaveFile], "Ctrl+S")], [], "")],Dock.Top)
           Grid ([GridLength(1.,GridUnitType.Star);GridLength(5.);GridLength(2.,GridUnitType.Star)],[],[
                     Column(tree,0)
                     Column(Splitter Vertical,1)
@@ -118,11 +119,11 @@ let ui (state:EditorState) =
                 ])
     ]
 
-let haskellSyntax = 
-    use reader = new XmlTextReader(@"FS-Mode.xshd")
-    ICSharpCode.AvalonEdit.Highlighting.Xshd.HighlightingLoader.Load(reader, HighlightingManager.Instance);
 
 let rec render ui : UIElement = 
+    let bgColor = new SolidColorBrush(Color.FromRgb (byte 39,byte 40,byte 34))
+    let fgColor = new SolidColorBrush(Color.FromRgb (byte 248,byte 248,byte 242))
+
     match ui with
         | Dock xs -> 
             let d = new DockPanel(LastChildFill=true)
@@ -149,8 +150,9 @@ let rec render ui : UIElement =
             let m = new Menu()
             for x in xs do m.Items.Add (render x) |> ignore
             m :> UIElement
-        | MenuItem (title,xs,actions) -> 
+        | MenuItem (title,xs,actions,gestureText) -> 
             let mi = Controls.MenuItem(Header=title) 
+            mi.InputGestureText <- gestureText
             for x in xs do mi.Items.Add(render x) |> ignore
             match actions with 
                 | [BrowseFile] -> mi.Click |> Observable.subscribe(fun e -> openFile()) |> ignore
@@ -192,15 +194,18 @@ let rec render ui : UIElement =
             ti :> UIElement
         | Editor doc ->
             let editor = new TextEditor();
+            editor.SyntaxHighlighting <- HighlightingManager.Instance.GetDefinitionByExtension(IO.Path.GetExtension(doc.FileName));
             editor.Document <- doc;
             editor.FontFamily <- FontFamily("Consolas")
             editor.TextChanged |> Observable.subscribe(fun e -> messages.OnNext(TextChanged doc)  ) |> ignore
-            editor.SyntaxHighlighting <- haskellSyntax;
             editor.ShowLineNumbers <- true
-//            editor.IsReadOnly <- false;
+            editor.Background <- bgColor
+            editor.Foreground <- fgColor
+            editor.Options.EnableRectangularSelection <- true
+
             editor :> UIElement
         | TextArea s -> 
-            let tb = new TextBlock()
+            let tb = new TextBlock(Background = bgColor, Foreground = fgColor)
             tb.Text <- s
             tb.FontFamily <- FontFamily("Consolas")
             tb :> UIElement
@@ -256,7 +261,6 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
                 (scroll:>UIElement)::resolve xs ys zs
             | ((TextArea a)::xs,(TextArea b)::ys,z::zs)  -> 
                 let tb = z :?> TextBlock
-                // Yeah todo, this is highlyt inefficent
                 tb.Text <- b
                 z::resolve xs ys zs
             | ([],y::ys,[]) -> (render y)::resolve [] ys []
@@ -269,7 +273,7 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
 // elm-make main.elm --yes
 let intialState = {
     openFiles=[]
-    watches=[("cd C:\Users\Laurent\Documents\code\like; elm-make main.elm --yes")]
+    watches=[("elm-make %currentpath% --yes")]
     consoleOutput=""
     current=""
     currentFolder=Directory ("Code", [Directory ("Src", [], ["file1.test";"file2.test"]) ], ["file1";"file2"]) 
@@ -302,16 +306,24 @@ let run (script:string) =
 
 //type App = XAML<"App.xaml">
 
+
 [<STAThread>]
 [<EntryPoint>]
 let main argv =
     
+    use reader = new XmlTextReader(@"Elm-Mode.xshd")
+    let customHighlighting = ICSharpCode.AvalonEdit.Highlighting.Xshd.HighlightingLoader.Load(reader, HighlightingManager.Instance);
+    HighlightingManager.Instance.RegisterHighlighting("Elm", [".elm"] |> List.toArray, customHighlighting);
 
     let w =  new Window(Title="F# is fun!",Width=260., Height=420.)
     w.Show()
     w.Content <- List.head <| resolve [] [ui intialState] [] 
 
-    let textChanged = messages.Where(function | TextChanged _ -> true | _ -> false).Throttle(TimeSpan.FromSeconds(2.),DispatcherScheduler.Current)
+
+    let saveCommand = new KretschIT.WP_Fx.UI.Commands.RelayCommand(fun e -> messages.OnNext(SaveFile)  )
+    w.InputBindings.Add(new KeyBinding(saveCommand,Key.S,ModifierKeys.Control)) |> ignore
+
+    let textChanged = messages.Where(function | TextChanged _ -> true | _ -> false).Throttle(TimeSpan.FromSeconds(1.),DispatcherScheduler.Current)
     //let commandOutputs = messages.Where(function | CommandOutput s -> true | _ -> false).Buffer(TimeSpan.FromSeconds(2.),DispatcherScheduler.Current).Select(fun b -> CommandOutputBuffered b )
     let optMessages = messages.Where(function | TextChanged _ -> false | _ -> true).Merge(textChanged)
 
@@ -321,16 +333,21 @@ let main argv =
                 match cmd with 
                 | TextChanged doc ->
                     let starize (t:String) = if t.EndsWith("*") then t else t+"*"
-                    for cmd in state.watches do run cmd |> ignore
                     {state with openFiles= List.map(fun (t,d) -> if d = doc then (starize t,d) else (t,d)) state.openFiles }      
                 | OpenFile s ->
                     let content = IO.File.ReadAllText(s)
                     let doc = new ICSharpCode.AvalonEdit.Document.TextDocument(content)
+                    doc.FileName <- s
                     {state with openFiles=state.openFiles@[(s,doc)] } 
                 | SaveFile -> 
                     let unstarize (s:String) = s.Replace("*","")
                     let (t,doc) = List.head state.openFiles
                     IO.File.WriteAllText(state.current,doc.Text)
+
+                    for cmd in state.watches do 
+                        let cwd s = "cd " +  IO.Path.GetDirectoryName doc.FileName + ";" + s
+                        cmd.Replace("%currentpath%", doc.FileName) |> cwd |> run |> ignore
+
                     {state with openFiles= List.map(fun (t,d) -> if d = doc then (unstarize t,d) else (t,d)) state.openFiles }      
                 | CommandOutput s ->
                     {state with consoleOutput = state.consoleOutput+"\n"+s}
@@ -340,7 +357,6 @@ let main argv =
         .Scan((ui intialState,ui intialState), fun (prevdom,newdom) state -> (newdom,ui state) )
         .Subscribe(function (p,c) -> w.Content <- List.head <| resolve [p] [c] [downcast w.Content]  )
         |>ignore
-
 
     let app = new Application()
     app.Run(w)

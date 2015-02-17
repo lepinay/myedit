@@ -197,6 +197,18 @@ let rec render ui : UIElement =
             ti :> UIElement
         | Editor doc ->
             let editor = new TextEditor();
+            let host = new System.Windows.Forms.Integration.WindowsFormsHost()
+            let editor2 = new ScintillaNET.Scintilla()
+            host.Child <- editor2
+
+            editor2.Text <- doc.Text
+            editor2.Font <- new Drawing.Font("Consolas",float32 10)
+            editor2.Margins.[0].Width <- 20
+            // https://scintillanet.codeplex.com/wikipage?title=HowToSyntax&referringTitle=Documentation
+            editor2.ConfigurationManager.Language <- "haskell"
+            editor2.ConfigurationManager.Cus <- "haskell"
+            editor2.ConfigurationManager.Configure()
+
             editor.SyntaxHighlighting <- HighlightingManager.Instance.GetDefinitionByExtension(IO.Path.GetExtension(doc.FileName));
             editor.Document <- doc;
             editor.FontFamily <- FontFamily("Consolas")
@@ -214,7 +226,7 @@ let rec render ui : UIElement =
 
             editor.Options.EnableRectangularSelection <- true
 
-            editor :> UIElement
+            host :> UIElement
         | TextArea s -> 
             let tb = new TextBox(Background = bgColor, Foreground = fgColor)
             tb.Text <- s

@@ -38,7 +38,7 @@ type Command =
     | OpenFile of string
     | TextChanged of TextDocument
     | CommandOutput of string
-    | DocSelected of string
+    | DocSelected of TextDocument
 
 type Element = 
     | Docked of Element*Dock
@@ -64,15 +64,15 @@ type Directory =
 
 type EditorState = {
     openFiles:(string*TextDocument) list
-    current:string
+    current:TextDocument
     watches : (string) list
     consoleOutput : string
     currentFolder: Directory
 }
 
 
-let debug = System.Diagnostics.Debug.WriteLine
 let messages = new Reactive.Subjects.Subject<Command>()
+let debug s = messages.OnNext <| CommandOutput s
 
 let openFile () = 
     let dlg = new Microsoft.Win32.OpenFileDialog();
@@ -94,7 +94,7 @@ let saveFile () =
 // We could optimize this by diffing the state to the previous state and generate only the updated dom
 // like we already do for the Dom to WPF transformation
 let ui (state:EditorState) = 
-    let tabs = state.openFiles |> List.map (fun (t,p) -> TabItem (IO.Path.GetFileName(t),Editor p, DocSelected t) )
+    let tabs = state.openFiles |> List.map (fun (t,p) -> TabItem (IO.Path.GetFileName(t),Editor p, DocSelected p) )
     let rec makeTree = function
         | None -> []
         | Directory (p, folders, files) -> 
@@ -286,7 +286,7 @@ let intialState = {
     openFiles=[]
     watches=[("elm-make %currentpath% --yes")]
     consoleOutput=""
-    current=""
+    current=null
     currentFolder=Directory ("Code", [Directory ("Src", [], ["file1.test";"file2.test"]) ], ["file1";"file2"]) 
     }
 
@@ -503,8 +503,8 @@ let main argv =
                     {state with openFiles=state.openFiles@[(s,doc)] } 
                 | SaveFile -> 
                     let unstarize (s:String) = s.Replace("*","")
-                    let (t,doc) = List.head state.openFiles
-                    IO.File.WriteAllText(state.current,doc.Text)
+                    let (t,doc) = List.find (fun (t,doc) -> doc = state.current) state.openFiles
+                    IO.File.WriteAllText(doc.FileName,doc.Text)
 
                     for cmd in state.watches do 
                         let cwd s = "cd " +  IO.Path.GetDirectoryName doc.FileName + ";" + s

@@ -75,7 +75,7 @@
       ([eE][+-]?[0-9]+)? # optional exponent
     </Rule>
 
-    <Rule color="Class">[A-Z]\w+</Rule>
+    <Rule color="Class">(?&lt;!\w)[A-Z]\w+</Rule>
     
   </RuleSet>
 </SyntaxDefinition>

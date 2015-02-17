@@ -182,8 +182,8 @@ namespace MyEdit.Powershell
 
         public override Size BufferSize
         {
-            get { return new Size(255, 25000); }
-            set { }
+            get { return new Size(Console.BufferWidth, Console.BufferHeight); }
+            set { Console.SetBufferSize(value.Width, value.Height); }
         }
 
         public override Coordinates CursorPosition

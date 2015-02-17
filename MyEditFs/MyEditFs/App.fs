@@ -5,6 +5,7 @@ open FsXaml
 
 open System
 open System.Windows          
+open System.Linq
 open System.Windows.Controls  
 open System.Reactive.Linq
 open ICSharpCode.AvalonEdit
@@ -19,6 +20,8 @@ open System.Management.Automation
 open System.Threading.Tasks
 open System.Reactive.Concurrency
 open System.Windows.Input
+open ICSharpCode.AvalonEdit.Folding
+open System.Diagnostics
 
 
 //#region helpers
@@ -201,11 +204,19 @@ let rec render ui : UIElement =
             editor.ShowLineNumbers <- true
             editor.Background <- bgColor
             editor.Foreground <- fgColor
+            editor.Options.ConvertTabsToSpaces <- true
+            editor.Options.EnableHyperlinks <- false
+            editor.Options.ShowColumnRuler <- true
+
+            let foldingManager = FoldingManager.Install(editor.TextArea);
+            let foldingStrategy = new XmlFoldingStrategy();
+            foldingStrategy.UpdateFoldings(foldingManager, editor.Document);
+
             editor.Options.EnableRectangularSelection <- true
 
             editor :> UIElement
         | TextArea s -> 
-            let tb = new TextBlock(Background = bgColor, Foreground = fgColor)
+            let tb = new TextBox(Background = bgColor, Foreground = fgColor)
             tb.Text <- s
             tb.FontFamily <- FontFamily("Consolas")
             tb :> UIElement
@@ -260,8 +271,8 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
                 scroll.ScrollToBottom()
                 (scroll:>UIElement)::resolve xs ys zs
             | ((TextArea a)::xs,(TextArea b)::ys,z::zs)  -> 
-                let tb = z :?> TextBlock
-                tb.Text <- b
+                let tb = z :?> TextBox
+                tb.AppendText("\n"+b)
                 z::resolve xs ys zs
             | ([],y::ys,[]) -> (render y)::resolve [] ys []
             | ([],[],[]) -> []
@@ -292,12 +303,32 @@ myRunSpace.Open();
 let run (script:string) = 
     Task.Run 
         (fun () ->
-            use powershell = PowerShell.Create();
-            powershell.Runspace <- myRunSpace;
-            powershell.AddScript(script) |> ignore
-            powershell.AddCommand("out-default") |> ignore
-            powershell.Commands.Commands.[0].MergeMyResults(PipelineResultTypes.Error, PipelineResultTypes.Output);
-            powershell.Invoke()
+//            use powershell = PowerShell.Create();
+//            powershell.Runspace <- myRunSpace;
+//            powershell.AddScript(script) |> ignore
+//            powershell.AddCommand("out-default") |> ignore
+//            powershell.Commands.Commands.[0].MergeMyResults(PipelineResultTypes.Error, PipelineResultTypes.Output);
+//            powershell.Invoke()
+              let pi = ProcessStartInfo (
+                        FileName = "cmd",
+                        Arguments = "/c cd C:\Users\Laurent\Documents\code\like && elm-make.exe main.elm --yes",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true )
+                        
+              let proc = new System.Diagnostics.Process()
+              proc.StartInfo <- pi
+
+              proc.Start() |> ignore
+
+              while not proc.StandardOutput.EndOfStream do
+                let line = proc.StandardOutput.ReadLine()
+                messages.OnNext <| CommandOutput line
+              while not proc.StandardError.EndOfStream do
+                let line = proc.StandardError.ReadLine()
+                messages.OnNext <| CommandOutput line
+              
             )
 
 
@@ -316,6 +347,7 @@ let main argv =
     HighlightingManager.Instance.RegisterHighlighting("Elm", [".elm"] |> List.toArray, customHighlighting);
 
     let w =  new Window(Title="F# is fun!",Width=260., Height=420.)
+    w.WindowState <- WindowState.Maximized
     w.Show()
     w.Content <- List.head <| resolve [] [ui intialState] [] 
 
@@ -323,7 +355,7 @@ let main argv =
     let saveCommand = new KretschIT.WP_Fx.UI.Commands.RelayCommand(fun e -> messages.OnNext(SaveFile)  )
     w.InputBindings.Add(new KeyBinding(saveCommand,Key.S,ModifierKeys.Control)) |> ignore
 
-    let textChanged = messages.Where(function | TextChanged _ -> true | _ -> false).Throttle(TimeSpan.FromSeconds(1.),DispatcherScheduler.Current)
+    let textChanged = messages.Where(function | TextChanged _ -> true | _ -> false).Throttle(TimeSpan.FromSeconds(1.))
     //let commandOutputs = messages.Where(function | CommandOutput s -> true | _ -> false).Buffer(TimeSpan.FromSeconds(2.),DispatcherScheduler.Current).Select(fun b -> CommandOutputBuffered b )
     let optMessages = messages.Where(function | TextChanged _ -> false | _ -> true).Merge(textChanged)
 
@@ -350,11 +382,12 @@ let main argv =
 
                     {state with openFiles= List.map(fun (t,d) -> if d = doc then (unstarize t,d) else (t,d)) state.openFiles }      
                 | CommandOutput s ->
-                    {state with consoleOutput = state.consoleOutput+"\n"+s}
+                    {state with consoleOutput = s}
                 | DocSelected s ->
                     {state with current = s}
                 | other -> state  )
         .Scan((ui intialState,ui intialState), fun (prevdom,newdom) state -> (newdom,ui state) )
+        .ObserveOnDispatcher()
         .Subscribe(function (p,c) -> w.Content <- List.head <| resolve [p] [c] [downcast w.Content]  )
         |>ignore
 

@@ -7,8 +7,8 @@
 
   <Color name="Comment" foreground="#75715E" />
   <Color name="String" foreground="#E6DB74" />
-  <Color name="Keyword" foreground="#F92672" />
-  <Color name="Digit" foreground="#AE81FF" />
+  <Color name="Keywords" foreground="#F92672" />
+  <Color name="Digits" foreground="#AE81FF" />
   <Color name="Class" foreground="#A6E22E" />
 
   <!-- This is the main ruleset. -->
@@ -25,7 +25,7 @@
       </RuleSet>
     </Span>
 
-    <Keywords fontWeight="bold" color="Keyword">
+    <Keywords fontWeight="bold" color="Keywords">
       <Word>as</Word>
       <Word>case</Word>
       <Word>class</Word>
@@ -66,7 +66,7 @@
     </Keywords>
 
     <!-- Digits -->
-    <Rule color="Digit">
+    <Rule color="Digits">
       \b0[xX][0-9a-fA-F]+  # hex number
       |    \b
       (    \d+(\.[0-9]+)?   #number with optional floating point

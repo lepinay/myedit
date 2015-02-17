@@ -57,6 +57,9 @@
     <None Include="Elm-Mode.xshd">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Include="HTML-Mode.xshd">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Include="FS-Mode.xshd">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

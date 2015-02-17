@@ -311,7 +311,7 @@ let run (script:string) =
 //            powershell.Invoke()
               let pi = ProcessStartInfo (
                         FileName = "cmd",
-                        Arguments = "/c cd C:\Users\Laurent\Documents\code\like && elm-make.exe main.elm --yes",
+                        Arguments = "/c cd C:\perso\like && elm-make.exe main.elm --yes",
                         UseShellExecute = false,
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
@@ -342,9 +342,139 @@ let run (script:string) =
 [<EntryPoint>]
 let main argv =
     
-    use reader = new XmlTextReader(@"Elm-Mode.xshd")
-    let customHighlighting = ICSharpCode.AvalonEdit.Highlighting.Xshd.HighlightingLoader.Load(reader, HighlightingManager.Instance);
-    HighlightingManager.Instance.RegisterHighlighting("Elm", [".elm"] |> List.toArray, customHighlighting);
+    let addSyntax (f:string) name ext = 
+        use reader = new XmlTextReader(f)
+        let customHighlighting = ICSharpCode.AvalonEdit.Highlighting.Xshd.HighlightingLoader.Load(reader, HighlightingManager.Instance);
+        HighlightingManager.Instance.RegisterHighlighting(name, ext |> List.toArray, customHighlighting);
+
+    addSyntax @"Elm-Mode.xshd" "Elm"  [".elm"]
+    addSyntax @"Html-Mode.xshd" "Html"  [".html";"*.htm"]
+
+    let color s = new SimpleHighlightingBrush(downcast ColorConverter.ConvertFromString(s))
+    let defaultColor = color "#FF0000"
+    let colors = 
+        [
+        "AccessKeywords", defaultColor;
+        "AccessModifiers", defaultColor;
+        "AddedText", defaultColor;
+        "ASPSection", defaultColor;
+        "ASPSectionStartEndTags", defaultColor;
+        "Assignment", defaultColor;
+        "AttributeName", defaultColor;
+        "Attributes", defaultColor;
+        "AttributeValue", defaultColor;
+        "BlockQuote", defaultColor;
+        "BooleanConstants", defaultColor;
+        "BrokenEntity", defaultColor;
+        "CData", defaultColor;
+        "Char", defaultColor;
+        "Character", defaultColor;
+        "CheckedKeyword", defaultColor;
+        "Class", color "#A6E22E";
+        "Code", defaultColor;
+        "Colon", defaultColor;
+        "Command", defaultColor;
+        "Comment", color "#75715E";
+        "CommentTags", defaultColor;
+        "CompoundKeywords", defaultColor;
+        "Constants", color "#AE81FF";
+        "ContextKeywords", defaultColor;
+        "ControlFlow", defaultColor;
+        "ControlStatements", defaultColor;
+        "CurlyBraces", defaultColor;
+        "DataTypes", defaultColor;
+        "DateLiteral", defaultColor;
+        "Digits", color "#AE81FF";
+        "DocComment", defaultColor;
+        "DocType", defaultColor;
+        "Emphasis", defaultColor;
+        "Entities", defaultColor;
+        "Entity", color "#F92672";
+        "EntityReference", defaultColor;
+        "ExceptionHandling", defaultColor;
+        "ExceptionHandlingStatements", defaultColor;
+        "ExceptionKeywords", defaultColor;
+        "FileName", defaultColor;
+        "Friend", defaultColor;
+        "FunctionCall", defaultColor;
+        "FunctionKeywords", defaultColor;
+        "GetSetAddRemove", defaultColor;
+        "GotoKeywords", defaultColor;
+        "Header", defaultColor;
+        "Heading", defaultColor;
+        "HtmlTag", color "#F92672";
+        "Image", defaultColor;
+        "IterationStatements", defaultColor;
+        "JavaDocTags", defaultColor;
+        "JavaScriptGlobalFunctions", defaultColor;
+        "JavaScriptIntrinsics", defaultColor;
+        "JavaScriptKeyWords", defaultColor;
+        "JavaScriptLiterals", defaultColor;
+        "JavaScriptTag", color "#F92672";
+        "JScriptTag", color "#F92672";
+        "JumpKeywords", defaultColor;
+        "JumpStatements", defaultColor;
+        "Keywords", color "#F92672";
+        "KnownDocTags", defaultColor;
+        "LineBreak", defaultColor;
+        "Link", defaultColor;
+        "Literals", defaultColor;
+        "LoopKeywords", defaultColor;
+        "MethodCall", defaultColor;
+        "MethodName", defaultColor;
+        "Modifiers", defaultColor;
+        "Namespace", defaultColor;
+        "NamespaceKeywords", defaultColor;
+        "NullOrValueKeywords", defaultColor;
+        "NumberLiteral", color "#AE81FF";
+        "OperatorKeywords", defaultColor;
+        "Operators", defaultColor;
+        "OtherTypes", defaultColor;
+        "Package", defaultColor;
+        "ParameterModifiers", defaultColor;
+        "Position", defaultColor;
+        "Preprocessor", defaultColor;
+        "Property", defaultColor;
+        "Punctuation", defaultColor;
+        "ReferenceTypeKeywords", defaultColor;
+        "ReferenceTypes", defaultColor;
+        "Regex", color "#F6AA11";
+        "RemovedText", defaultColor;
+        "ScriptTag", color "#F92672";
+        "SelectionStatements", defaultColor;
+        "Selector", defaultColor;
+        "Slash", defaultColor;
+        "String", color "#66D9EF";
+        "StrongEmphasis", defaultColor;
+        "Tags", color "#F92672";
+        "This", defaultColor;
+        "ThisOrBaseReference", defaultColor;
+        "TrueFalse", defaultColor;
+        "TypeKeywords", defaultColor;
+        "UnchangedText", defaultColor;
+        "UnknownAttribute", defaultColor;
+        "UnknownScriptTag", defaultColor;
+        "UnsafeKeywords", defaultColor;
+        "Value", defaultColor;
+        "ValueTypeKeywords", defaultColor;
+        "ValueTypes", defaultColor;
+        "Variable", defaultColor;
+        "VBScriptTag", defaultColor;
+        "Visibility", defaultColor;
+        "Void", defaultColor;
+        "XmlDeclaration", defaultColor;
+        "XmlPunctuation", defaultColor;
+        "XmlString", defaultColor;
+        "XmlTag", color "#F92672"] 
+        |> Map.ofList
+    
+
+    for def in HighlightingManager.Instance.HighlightingDefinitions do
+        for c in def.NamedHighlightingColors do 
+            c.Foreground <- colors.[c.Name]
+    
+//                c.Foreground <- new SimpleHighlightingBrush(Color.FromRgb (byte 248,byte 248,byte 242))
+
 
     let w =  new Window(Title="F# is fun!",Width=260., Height=420.)
     w.WindowState <- WindowState.Maximized

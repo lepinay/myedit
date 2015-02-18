@@ -65,6 +65,7 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <Content Include="WP-Fx_License.txt" />
+    <Resource Include="cross.xaml" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Accessibility" />

@@ -23,6 +23,7 @@ open System.Windows.Input
 open ICSharpCode.AvalonEdit.Folding
 open System.Diagnostics
 open ICSharpCode.AvalonEdit.Search
+open System.Windows.Shapes
 
 
 //#region helpers
@@ -154,6 +155,127 @@ let ui (state:EditorState) =
                 ])
     ]
 
+let color s = new SimpleHighlightingBrush(downcast ColorConverter.ConvertFromString(s))
+let defaultColor = color "#FF0000"
+let colors = 
+    [
+    "AccessKeywords", defaultColor;
+    "AccessModifiers", defaultColor;
+    "AddedText", defaultColor;
+    "ASPSection", defaultColor;
+    "ASPSectionStartEndTags", defaultColor;
+    "Assignment", defaultColor;
+    "AttributeName", defaultColor;
+    "Attributes", defaultColor;
+    "AttributeValue", defaultColor;
+    "BlockQuote", defaultColor;
+    "BooleanConstants", defaultColor;
+    "BrokenEntity", defaultColor;
+    "CData", defaultColor;
+    "Char", defaultColor;
+    "Character", defaultColor;
+    "CheckedKeyword", defaultColor;
+    "Class", color "#A6E22E";
+    "Code", defaultColor;
+    "Colon", defaultColor;
+    "Command", defaultColor;
+    "Comment", color "#75715E";
+    "CommentTags", defaultColor;
+    "CompoundKeywords", defaultColor;
+    "Constants", color "#AE81FF";
+    "ContextKeywords", defaultColor;
+    "ControlFlow", defaultColor;
+    "ControlStatements", defaultColor;
+    "CurlyBraces", defaultColor;
+    "DataTypes", defaultColor;
+    "DateLiteral", defaultColor;
+    "Digits", color "#AE81FF";
+    "DocComment", defaultColor;
+    "DocType", defaultColor;
+    "Emphasis", defaultColor;
+    "Entities", defaultColor;
+    "Entity", color "#F92672";
+    "EntityReference", defaultColor;
+    "ExceptionHandling", defaultColor;
+    "ExceptionHandlingStatements", defaultColor;
+    "ExceptionKeywords", defaultColor;
+    "FileName", defaultColor;
+    "FindHighlight", color "#FFE792";
+    "FindHighlightForeground", color "#000000";
+    "Friend", defaultColor;
+    "FunctionCall", defaultColor;
+    "FunctionKeywords", defaultColor;
+    "GetSetAddRemove", defaultColor;
+    "GotoKeywords", defaultColor;
+    "Header", defaultColor;
+    "Heading", defaultColor;
+    "HtmlTag", color "#F92672";
+    "Image", defaultColor;
+    "IterationStatements", defaultColor;
+    "JavaDocTags", defaultColor;
+    "JavaScriptGlobalFunctions", defaultColor;
+    "JavaScriptIntrinsics", defaultColor;
+    "JavaScriptKeyWords", defaultColor;
+    "JavaScriptLiterals", defaultColor;
+    "JavaScriptTag", color "#F92672";
+    "JScriptTag", color "#F92672";
+    "JumpKeywords", defaultColor;
+    "JumpStatements", defaultColor;
+    "Keywords", color "#F92672";
+    "KnownDocTags", defaultColor;
+    "LineBreak", defaultColor;
+    "Link", defaultColor;
+    "Literals", defaultColor;
+    "LoopKeywords", defaultColor;
+    "MethodCall", defaultColor;
+    "MethodName", defaultColor;
+    "Modifiers", defaultColor;
+    "Namespace", defaultColor;
+    "NamespaceKeywords", defaultColor;
+    "NullOrValueKeywords", defaultColor;
+    "NumberLiteral", color "#AE81FF";
+    "OperatorKeywords", defaultColor;
+    "Operators", defaultColor;
+    "OtherTypes", defaultColor;
+    "Package", defaultColor;
+    "ParameterModifiers", defaultColor;
+    "Position", defaultColor;
+    "Preprocessor", defaultColor;
+    "Property", defaultColor;
+    "Punctuation", defaultColor;
+    "ReferenceTypeKeywords", defaultColor;
+    "ReferenceTypes", defaultColor;
+    "Regex", color "#F6AA11";
+    "RemovedText", defaultColor;
+    "ScriptTag", color "#F92672";
+    "SelectionStatements", defaultColor;
+    "Selector", defaultColor;
+    "Slash", defaultColor;
+    "String", color "#66D9EF";
+    "StrongEmphasis", defaultColor;
+    "Tags", color "#F92672";
+    "This", defaultColor;
+    "ThisOrBaseReference", defaultColor;
+    "TrueFalse", defaultColor;
+    "TypeKeywords", defaultColor;
+    "UnchangedText", defaultColor;
+    "UnknownAttribute", defaultColor;
+    "UnknownScriptTag", defaultColor;
+    "UnsafeKeywords", defaultColor;
+    "Value", defaultColor;
+    "ValueTypeKeywords", defaultColor;
+    "ValueTypes", defaultColor;
+    "Variable", defaultColor;
+    "VBScriptTag", defaultColor;
+    "Visibility", defaultColor;
+    "Void", defaultColor;
+    "XmlDeclaration", defaultColor;
+    "XmlPunctuation", defaultColor;
+    "XmlString", defaultColor;
+    "XmlTag", color "#F92672"] 
+    |> Map.ofList
+
+type Cross = FsXaml.XAML<"cross.xaml", true>
 
 let rec render ui : UIElement = 
     let bgColor = new SolidColorBrush(Color.FromRgb (byte 39,byte 40,byte 34))
@@ -177,7 +299,10 @@ let rec render ui : UIElement =
         | TabItem (title,e,com) ->
             let ti = new TabItem()
             ti.Content <- render e
-            ti.Header <- title
+            let closeButton = new Cross()
+            closeButton.title.Text <- title
+//            closeButton.closeButton.Click 
+            ti.Header <- closeButton
             ti.IsSelected <- true
             ti.Tag <- com
             ti :> UIElement
@@ -240,7 +365,9 @@ let rec render ui : UIElement =
             editor.Options.ConvertTabsToSpaces <- true
             editor.Options.EnableHyperlinks <- false
             editor.Options.ShowColumnRuler <- true
-            SearchPanel.Install(editor) |> ignore
+            let sp = SearchPanel.Install(editor)
+            let brush = colors.["FindHighlight"]
+            sp.MarkerBrush  <- brush.GetBrush(null)
 
 
             let foldingManager = FoldingManager.Install(editor.TextArea);
@@ -396,125 +523,6 @@ let main argv =
 
     addSyntax @"Elm-Mode.xshd" "Elm"  [".elm"]
     addSyntax @"Html-Mode.xshd" "Html"  [".html";"*.htm"]
-
-    let color s = new SimpleHighlightingBrush(downcast ColorConverter.ConvertFromString(s))
-    let defaultColor = color "#FF0000"
-    let colors = 
-        [
-        "AccessKeywords", defaultColor;
-        "AccessModifiers", defaultColor;
-        "AddedText", defaultColor;
-        "ASPSection", defaultColor;
-        "ASPSectionStartEndTags", defaultColor;
-        "Assignment", defaultColor;
-        "AttributeName", defaultColor;
-        "Attributes", defaultColor;
-        "AttributeValue", defaultColor;
-        "BlockQuote", defaultColor;
-        "BooleanConstants", defaultColor;
-        "BrokenEntity", defaultColor;
-        "CData", defaultColor;
-        "Char", defaultColor;
-        "Character", defaultColor;
-        "CheckedKeyword", defaultColor;
-        "Class", color "#A6E22E";
-        "Code", defaultColor;
-        "Colon", defaultColor;
-        "Command", defaultColor;
-        "Comment", color "#75715E";
-        "CommentTags", defaultColor;
-        "CompoundKeywords", defaultColor;
-        "Constants", color "#AE81FF";
-        "ContextKeywords", defaultColor;
-        "ControlFlow", defaultColor;
-        "ControlStatements", defaultColor;
-        "CurlyBraces", defaultColor;
-        "DataTypes", defaultColor;
-        "DateLiteral", defaultColor;
-        "Digits", color "#AE81FF";
-        "DocComment", defaultColor;
-        "DocType", defaultColor;
-        "Emphasis", defaultColor;
-        "Entities", defaultColor;
-        "Entity", color "#F92672";
-        "EntityReference", defaultColor;
-        "ExceptionHandling", defaultColor;
-        "ExceptionHandlingStatements", defaultColor;
-        "ExceptionKeywords", defaultColor;
-        "FileName", defaultColor;
-        "Friend", defaultColor;
-        "FunctionCall", defaultColor;
-        "FunctionKeywords", defaultColor;
-        "GetSetAddRemove", defaultColor;
-        "GotoKeywords", defaultColor;
-        "Header", defaultColor;
-        "Heading", defaultColor;
-        "HtmlTag", color "#F92672";
-        "Image", defaultColor;
-        "IterationStatements", defaultColor;
-        "JavaDocTags", defaultColor;
-        "JavaScriptGlobalFunctions", defaultColor;
-        "JavaScriptIntrinsics", defaultColor;
-        "JavaScriptKeyWords", defaultColor;
-        "JavaScriptLiterals", defaultColor;
-        "JavaScriptTag", color "#F92672";
-        "JScriptTag", color "#F92672";
-        "JumpKeywords", defaultColor;
-        "JumpStatements", defaultColor;
-        "Keywords", color "#F92672";
-        "KnownDocTags", defaultColor;
-        "LineBreak", defaultColor;
-        "Link", defaultColor;
-        "Literals", defaultColor;
-        "LoopKeywords", defaultColor;
-        "MethodCall", defaultColor;
-        "MethodName", defaultColor;
-        "Modifiers", defaultColor;
-        "Namespace", defaultColor;
-        "NamespaceKeywords", defaultColor;
-        "NullOrValueKeywords", defaultColor;
-        "NumberLiteral", color "#AE81FF";
-        "OperatorKeywords", defaultColor;
-        "Operators", defaultColor;
-        "OtherTypes", defaultColor;
-        "Package", defaultColor;
-        "ParameterModifiers", defaultColor;
-        "Position", defaultColor;
-        "Preprocessor", defaultColor;
-        "Property", defaultColor;
-        "Punctuation", defaultColor;
-        "ReferenceTypeKeywords", defaultColor;
-        "ReferenceTypes", defaultColor;
-        "Regex", color "#F6AA11";
-        "RemovedText", defaultColor;
-        "ScriptTag", color "#F92672";
-        "SelectionStatements", defaultColor;
-        "Selector", defaultColor;
-        "Slash", defaultColor;
-        "String", color "#66D9EF";
-        "StrongEmphasis", defaultColor;
-        "Tags", color "#F92672";
-        "This", defaultColor;
-        "ThisOrBaseReference", defaultColor;
-        "TrueFalse", defaultColor;
-        "TypeKeywords", defaultColor;
-        "UnchangedText", defaultColor;
-        "UnknownAttribute", defaultColor;
-        "UnknownScriptTag", defaultColor;
-        "UnsafeKeywords", defaultColor;
-        "Value", defaultColor;
-        "ValueTypeKeywords", defaultColor;
-        "ValueTypes", defaultColor;
-        "Variable", defaultColor;
-        "VBScriptTag", defaultColor;
-        "Visibility", defaultColor;
-        "Void", defaultColor;
-        "XmlDeclaration", defaultColor;
-        "XmlPunctuation", defaultColor;
-        "XmlString", defaultColor;
-        "XmlTag", color "#F92672"] 
-        |> Map.ofList
-    
 
     for def in HighlightingManager.Instance.HighlightingDefinitions do
         for c in def.NamedHighlightingColors do 

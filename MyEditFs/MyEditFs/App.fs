@@ -53,9 +53,28 @@ type TextAreaElement =
           | :? TextAreaElement as y -> compare x.text y.text
           | _ -> invalidArg "yobj" "cannot compare values of different types"
 
+[<CustomEquality; CustomComparison>]
+type TabItemElement =
+    { title: string
+      selected:bool
+      element: Element
+      onSelected : (unit -> unit) option
+      onClose : (unit -> unit) option } 
+    override x.Equals(yobj) =
+        match yobj with
+        | :? TabItemElement as y -> x.selected = y.selected && x.title = y.title && x.element = y.element
+        | _ -> false
+ 
+    override x.GetHashCode() = (hash x.selected) ^^^ (hash x.title) ^^^ (hash x.element)
+    interface System.IComparable with
+      member x.CompareTo yobj =
+          match yobj with
+          | :? TabItemElement as y -> compare x.title y.title
+          | _ -> invalidArg "yobj" "cannot compare values of different types"
+
 // http://blogs.msdn.com/b/dsyme/archive/2009/11/08/equality-and-comparison-constraints-in-f-1-9-7.aspx
 // TODO separate pure UI command from application business commands
-type Command =
+and Command =
     | BrowseFile
     | BrowseFolder
     | SaveFile
@@ -63,6 +82,7 @@ type Command =
     | TextChanged of TextDocument
     | CommandOutput of string
     | DocSelected of TextDocument
+    | DocClosed of TextDocument
     | Search of string
     | SearchNext of string
 // TODO see before, elements should have their own commands
@@ -79,7 +99,7 @@ and Element =
     | Tree of Element list
     | TreeItem of Title*Element list
     | Editor of EditorElement
-    | TabItem of (String*Element*Command)
+    | TabItem of TabItemElement
     | TextArea of TextAreaElement
     | Tab of Element list
     | Scroll of Element
@@ -127,7 +147,22 @@ let saveFile () =
 // We could optimize this by diffing the state to the previous state and generate only the updated dom
 // like we already do for the Dom to WPF transformation
 let ui (state:EditorState) = 
-    let tabs = state.openFiles |> List.map (fun state -> TabItem (IO.Path.GetFileName(state.path),Dock[Docked(TextArea {text=state.search;onTextChanged=Some(fun s -> messages.OnNext(Search s));onReturn=Some(fun s -> messages.OnNext(SearchNext s)) },Dock.Top);Editor {doc=state.doc;selection=state.selectedText}], DocSelected state.doc) )
+    let filesToTabs docState = 
+        TabItem {
+            title=IO.Path.GetFileName(docState.path)
+            selected = state.current = docState.doc
+            element=Dock
+                [
+                    Docked(TextArea {
+                                        text=docState.search
+                                        onTextChanged=Some(fun s -> messages.OnNext(Search s))
+                                        onReturn=Some(fun s -> messages.OnNext(SearchNext s)) },Dock.Top)
+                    Editor {doc=docState.doc;selection=docState.selectedText}]
+            onSelected = Some( fun () -> messages.OnNext(DocSelected docState.doc) )
+            onClose = Some( fun () -> messages.OnNext(DocClosed docState.doc) )}
+    let tabs = 
+        state.openFiles 
+        |> List.map filesToTabs
     let rec makeTree = function
         | None -> []
         | Directory (p, folders, files) -> 
@@ -147,11 +182,11 @@ let ui (state:EditorState) =
                     Column(
                         Grid ([GridLength(1.,GridUnitType.Star)],
                               [GridLength(2.,GridUnitType.Star);GridLength(5.);GridLength(1.,GridUnitType.Star)],
-                            [
-                                Row(Tab tabs,0)
-                                Row(Splitter Horizontal,1)
-                                Row(Scroll(TextArea {text = state.consoleOutput;onTextChanged = Option.None;onReturn = Option.None}),2)
-                            ]),2)
+                                [
+                                    Row(Tab tabs,0)
+                                    Row(Splitter Horizontal,1)
+                                    Row(Scroll(TextArea {text = state.consoleOutput;onTextChanged = Option.None;onReturn = Option.None}),2)
+                                ]),2)
                 ])
     ]
 
@@ -290,21 +325,22 @@ let rec render ui : UIElement =
         | Tab xs -> 
             let d = new TabControl()            
             for x in xs do d.Items.Add (render x) |> ignore
-            d.SelectionChanged |> Observable.subscribe(fun e -> 
-                let item = d.SelectedItem :?> TabItem
-                if item <> null then
-                    let tag = item.Tag :?> Command
-                    messages.OnNext tag |> ignore) |> ignore
             d :> UIElement
-        | TabItem (title,e,com) ->
+        | TabItem {title=title;element=e;onSelected=com;onClose=close;selected=selected} ->
             let ti = new TabItem()
             ti.Content <- render e
             let closeButton = new Cross()
             closeButton.title.Text <- title
-//            closeButton.closeButton.Click 
+            closeButton.title.MouseLeftButtonDown
+                |> Observable.subscribe(fun e ->
+                    match com with 
+                        | Some(tag) -> tag() |> ignore 
+                        | Option.None -> ()) |> ignore
+            match close with
+                | Some(close) -> closeButton.closeButton.Click |> Observable.subscribe(fun e -> close()) |> ignore
+                | Option.None -> ()
             ti.Header <- closeButton
-            ti.IsSelected <- true
-            ti.Tag <- com
+            ti.IsSelected <- selected
             ti :> UIElement
         | Menu xs ->
             let m = new Menu()
@@ -400,16 +436,19 @@ let collToList (coll:UIElementCollection) : UIElement list =
 let itemsToList (coll:ItemCollection) =
     seq { for c in coll -> c :?> UIElement } |> Seq.toList
 
+// Goal of this method is to avoid to call render as much as possible and instead reuse as much as already existing WPF controls between 
+// virtual dom changes
+// Calling render is expensive as it will create new control and trigger reflows
 let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) : UIElement list = 
     if prev = curr then screen 
     else 
         match (prev,curr,screen) with
             | (x::xs,y::ys,z::zs) when x = y -> z::resolve xs ys zs
-            | ((TabItem (ta,ea,coma))::xs,(TabItem (tb,eb,comb))::ys,z::zs) -> 
+            | ((TabItem {title=ta;element=ea})::xs,(TabItem {title=tb;element=eb;selected=selb})::ys,z::zs) -> 
                 let ti = z :?> TabItem
                 let header = ti.Header :?> Cross
                 header.title.Text <- tb
-                ti.IsSelected <- true
+                ti.IsSelected <- selb
                 ti.Content <- List.head <| resolve [ea] [eb] [ti.Content :?> UIElement]
                 z::resolve xs ys zs
             | ((Tab a)::xs,(Tab b)::ys,z::zs) -> 
@@ -433,7 +472,7 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
                 grid.Children.Clear()
                 for c in resolve a b childrens do grid.Children.Add(c) |> ignore
                 (grid :> UIElement)::resolve xs ys zs
-            | ((Editor {doc=tda;selection=sela})::xs,(Editor {doc=tdb;selection=selb})::ys,z::zs) when tda = tdb -> 
+            | ((Editor {doc=tda;selection=sela})::xs,(Editor {doc=tdb;selection=selb})::ys,z::zs)  -> 
                 let editor = z :?> TextEditor
                 match selb with
                     | [(s,e)] -> editor.Select(s,e)
@@ -451,10 +490,18 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
                 z::resolve xs ys zs
             | ([],y::ys,[]) -> (render y)::resolve [] ys []
             | ([],[],[]) -> []
+
+            // UI element removed
+            | (x::xs,[],zs) -> 
+                // for z in zs do ??? what should we do when ui element are removed from the UI, right now they should be GCed
+                // will need to check w dont have memory leaks, speialy with all the event subscribers that could be still attached
+                // scary place here
+                []
+            
             | (_,y::ys,_) -> 
                 failwith <| sprintf "unable to reuse from %A" y
                 (render y)::resolve [] ys []
-            | other -> failwith <| sprintf "not handled:\n%A" other
+            | other -> failwith <| sprintf "not handled:\nPREV\n%A\nCURR\n%A\nSCREEN\n%A" prev curr screen
 
 // elm-make main.elm --yes
 let intialState = {
@@ -511,7 +558,14 @@ let run (script:string) =
 
 
 //type App = XAML<"App.xaml">
-
+let rec oneBefore files doc = 
+    match files with
+        | [] -> null
+        | [current] when current.doc = doc -> null
+        | before::current::xs when current.doc = doc -> before.doc
+        | current::next::xs when current.doc = doc -> next.doc
+        | x::xs -> oneBefore xs doc
+        | [x] -> null
 
 [<STAThread>]
 [<EntryPoint>]
@@ -573,6 +627,8 @@ let main argv =
                     {state with consoleOutput = s}
                 | DocSelected s ->
                     {state with current = s}
+                | DocClosed s ->
+                    {state with openFiles = state.openFiles |> List.filter(fun tstate -> tstate.doc <> s ); current = oneBefore state.openFiles s   }
                 | Search s ->
                     let res = state.current.Text.IndexOf(s)
                     if res >= 0 then

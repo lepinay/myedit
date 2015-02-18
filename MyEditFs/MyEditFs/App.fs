@@ -407,7 +407,8 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
             | (x::xs,y::ys,z::zs) when x = y -> z::resolve xs ys zs
             | ((TabItem (ta,ea,coma))::xs,(TabItem (tb,eb,comb))::ys,z::zs) -> 
                 let ti = z :?> TabItem
-                ti.Header <- tb
+                let header = ti.Header :?> Cross
+                header.title.Text <- tb
                 ti.IsSelected <- true
                 ti.Content <- List.head <| resolve [ea] [eb] [ti.Content :?> UIElement]
                 z::resolve xs ys zs
@@ -485,7 +486,7 @@ let run (script:string) =
 //            powershell.Invoke()
               let pi = ProcessStartInfo (
                         FileName = "cmd",
-                        Arguments = "/c cd C:\Users\Laurent\Documents\code\like && elm-make.exe main.elm --yes",
+                        Arguments = "/c cd C:\perso\like && elm-make.exe main.elm --yes",
                         UseShellExecute = false,
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,

@@ -30,7 +30,12 @@ type Row = GridLength
 type Title = String
 type SplitterDirection = Horizontal | Vertical
 
+type EditorElement =
+    { doc: TextDocument;
+      selection: (int*int)list } 
 
+
+// http://blogs.msdn.com/b/dsyme/archive/2009/11/08/equality-and-comparison-constraints-in-f-1-9-7.aspx
 // TODO separate pure UI command from application business commands
 type Command =
     | BrowseFile
@@ -41,7 +46,6 @@ type Command =
     | CommandOutput of string
     | DocSelected of TextDocument
     | ElementChanged of Element
-
 // TODO see before, elements should have their own commands
 and Element = 
     | Docked of Element*Dock
@@ -55,7 +59,7 @@ and Element =
     | Terminal
     | Tree of Element list
     | TreeItem of Title*Element list
-    | Editor of TextDocument*(int*int)list
+    | Editor of EditorElement
     | TabItem of (String*Element*Command)
     | TextArea of string*string
     | Tab of Element list
@@ -104,7 +108,7 @@ let saveFile () =
 // We could optimize this by diffing the state to the previous state and generate only the updated dom
 // like we already do for the Dom to WPF transformation
 let ui (state:EditorState) = 
-    let tabs = state.openFiles |> List.map (fun state -> TabItem (IO.Path.GetFileName(state.path),Dock[Docked(TextArea (state.search,"searchBox"),Dock.Top);Editor (state.doc,state.selectedText)], DocSelected state.doc) )
+    let tabs = state.openFiles |> List.map (fun state -> TabItem (IO.Path.GetFileName(state.path),Dock[Docked(TextArea (state.search,"searchBox"),Dock.Top);Editor {doc=state.doc;selection=state.selectedText}], DocSelected state.doc) )
     let rec makeTree = function
         | None -> []
         | Directory (p, folders, files) -> 
@@ -205,7 +209,7 @@ let rec render ui : UIElement =
             ti.Header <- title
             for x in xs do ti.Items.Add(render x) |> ignore
             ti :> UIElement
-        | Editor (doc,selection) ->
+        | Editor {doc=doc;selection=selection} ->
             let editor = new TextEditor();
 
             editor.SyntaxHighlighting <- HighlightingManager.Instance.GetDefinitionByExtension(IO.Path.GetExtension(doc.FileName));
@@ -253,6 +257,7 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
                 let ti = z :?> TabItem
                 ti.Header <- tb
                 ti.IsSelected <- true
+                ti.Content <- List.head <| resolve [ea] [eb] [ti.Content :?> UIElement]
                 z::resolve xs ys zs
             | ((Tab a)::xs,(Tab b)::ys,z::zs) -> 
                 let tab = z :?> TabControl     
@@ -275,7 +280,7 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
                 grid.Children.Clear()
                 for c in resolve a b childrens do grid.Children.Add(c) |> ignore
                 (grid :> UIElement)::resolve xs ys zs
-            | ((Editor (tda,sela))::xs,(Editor (tdb,selb))::ys,z::zs) when tda = tdb -> 
+            | ((Editor {doc=tda;selection=sela})::xs,(Editor {doc=tdb;selection=selb})::ys,z::zs) when tda = tdb -> 
                 let editor = z :?> TextEditor
                 match selb with
                     | [(s,e)] -> editor.Select(s,e)
@@ -536,7 +541,7 @@ let main argv =
                     {state with current = s}
                 | ElementChanged (TextArea (s, id)) when id = "searchBox" ->
                     let res = state.current.Text.IndexOf(s)
-                    if res > 0 then
+                    if res >= 0 then
                         let tstate = List.find (fun tsate -> tsate.doc = state.current) state.openFiles
                         {state with openFiles= List.map (fun tab -> if tab.doc = state.current then {tab with selectedText = [(res,s.Length)] } else tab ) state.openFiles }
                     else state

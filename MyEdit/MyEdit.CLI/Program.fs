@@ -11,7 +11,7 @@ let main argv =
     myRunSpace.Open();
     use powershell = PowerShell.Create();
     powershell.Runspace <- myRunSpace;
-    powershell.AddScript("elm-make.exe C:\Users\Laurent\Documents\code\like\main.elm --yes") |> ignore
+    powershell.AddScript("cd C:\Users\Laurent\Documents\code\like\; elm-make.exe main.elm --yes") |> ignore
     powershell.AddCommand("out-default") |> ignore
     powershell.Commands.Commands.[0].MergeMyResults(PipelineResultTypes.Error, PipelineResultTypes.Output);
     let results = powershell.Invoke()

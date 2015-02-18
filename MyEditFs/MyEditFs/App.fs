@@ -31,6 +31,7 @@ type Title = String
 type SplitterDirection = Horizontal | Vertical
 
 
+// TODO separate pure UI command from application business commands
 type Command =
     | BrowseFile
     | BrowseFolder
@@ -39,8 +40,10 @@ type Command =
     | TextChanged of TextDocument
     | CommandOutput of string
     | DocSelected of TextDocument
+    | ElementChanged of Element
 
-type Element = 
+// TODO see before, elements should have their own commands
+and Element = 
     | Docked of Element*Dock
     | Column of Element*int
     | Row of Element*int
@@ -52,9 +55,9 @@ type Element =
     | Terminal
     | Tree of Element list
     | TreeItem of Title*Element list
-    | Editor of TextDocument
+    | Editor of TextDocument*(int*int)list
     | TabItem of (String*Element*Command)
-    | TextArea of string
+    | TextArea of string*string
     | Tab of Element list
     | Scroll of Element
 
@@ -62,8 +65,15 @@ type Directory =
     | None
     | Directory of string*Directory list*string list
 
+type TabState = {
+    path:string
+    doc:TextDocument
+    search:string
+    selectedText:(int*int)list
+}
+
 type EditorState = {
-    openFiles:(string*TextDocument) list
+    openFiles:TabState list
     current:TextDocument
     watches : (string) list
     consoleOutput : string
@@ -94,7 +104,7 @@ let saveFile () =
 // We could optimize this by diffing the state to the previous state and generate only the updated dom
 // like we already do for the Dom to WPF transformation
 let ui (state:EditorState) = 
-    let tabs = state.openFiles |> List.map (fun (t,p) -> TabItem (IO.Path.GetFileName(t),Editor p, DocSelected p) )
+    let tabs = state.openFiles |> List.map (fun state -> TabItem (IO.Path.GetFileName(state.path),Dock[Docked(TextArea (state.search,"searchBox"),Dock.Top);Editor (state.doc,state.selectedText)], DocSelected state.doc) )
     let rec makeTree = function
         | None -> []
         | Directory (p, folders, files) -> 
@@ -117,7 +127,7 @@ let ui (state:EditorState) =
                             [
                                 Row(Tab tabs,0)
                                 Row(Splitter Horizontal,1)
-                                Row(Scroll(TextArea state.consoleOutput),2)
+                                Row(Scroll(TextArea (state.consoleOutput,"")),2)
                             ]),2)
                 ])
     ]
@@ -195,19 +205,8 @@ let rec render ui : UIElement =
             ti.Header <- title
             for x in xs do ti.Items.Add(render x) |> ignore
             ti :> UIElement
-        | Editor doc ->
+        | Editor (doc,selection) ->
             let editor = new TextEditor();
-            let host = new System.Windows.Forms.Integration.WindowsFormsHost()
-            let editor2 = new ScintillaNET.Scintilla()
-            host.Child <- editor2
-
-            editor2.Text <- doc.Text
-            editor2.Font <- new Drawing.Font("Consolas",float32 10)
-            editor2.Margins.[0].Width <- 20
-            // https://scintillanet.codeplex.com/wikipage?title=HowToSyntax&referringTitle=Documentation
-            editor2.ConfigurationManager.Language <- "haskell"
-            editor2.ConfigurationManager.Cus <- "haskell"
-            editor2.ConfigurationManager.Configure()
 
             editor.SyntaxHighlighting <- HighlightingManager.Instance.GetDefinitionByExtension(IO.Path.GetExtension(doc.FileName));
             editor.Document <- doc;
@@ -226,11 +225,12 @@ let rec render ui : UIElement =
 
             editor.Options.EnableRectangularSelection <- true
 
-            host :> UIElement
-        | TextArea s -> 
+            editor :> UIElement
+        | TextArea (s, id) -> 
             let tb = new TextBox(Background = bgColor, Foreground = fgColor)
             tb.Text <- s
             tb.FontFamily <- FontFamily("Consolas")
+            if id <> "" then tb. TextChanged |> Observable.subscribe(fun e -> messages.OnNext(ElementChanged <|TextArea (tb.Text, id)) ) |> ignore
             tb :> UIElement
         | Scroll e ->
             let scroll = new ScrollViewer()
@@ -249,7 +249,7 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
     else 
         match (prev,curr,screen) with
             | (x::xs,y::ys,z::zs) when x = y -> z::resolve xs ys zs
-            | ((TabItem (ta,ea,coma))::xs,(TabItem (tb,eb,comb))::ys,z::zs) when ea = eb -> 
+            | ((TabItem (ta,ea,coma))::xs,(TabItem (tb,eb,comb))::ys,z::zs) -> 
                 let ti = z :?> TabItem
                 ti.Header <- tb
                 ti.IsSelected <- true
@@ -275,14 +275,19 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
                 grid.Children.Clear()
                 for c in resolve a b childrens do grid.Children.Add(c) |> ignore
                 (grid :> UIElement)::resolve xs ys zs
-            | ((Editor tda)::xs,(Editor tdb)::ys,z::zs) when tda = tdb -> 
+            | ((Editor (tda,sela))::xs,(Editor (tdb,selb))::ys,z::zs) when tda = tdb -> 
+                let editor = z :?> TextEditor
+                match selb with
+                    | [(s,e)] -> editor.Select(s,e)
+                    | [] -> editor.SelectionLength <- 0
+                    | multiselect -> ()
                 z::resolve xs ys zs
             | ((Scroll a)::xs,(Scroll b)::ys,z::zs) -> 
                 let scroll = z :?> ScrollViewer
                 scroll.Content <- List.head <| resolve [a] [b] [scroll.Content :?> UIElement]
                 scroll.ScrollToBottom()
                 (scroll:>UIElement)::resolve xs ys zs
-            | ((TextArea a)::xs,(TextArea b)::ys,z::zs)  -> 
+            | ((TextArea (a,ida))::xs,(TextArea (b,idb))::ys,z::zs)  -> 
                 let tb = z :?> TextBox
                 tb.AppendText("\n"+b)
                 z::resolve xs ys zs
@@ -323,7 +328,7 @@ let run (script:string) =
 //            powershell.Invoke()
               let pi = ProcessStartInfo (
                         FileName = "cmd",
-                        Arguments = "/c cd C:\perso\like && elm-make.exe main.elm --yes",
+                        Arguments = "/c cd C:\Users\Laurent\Documents\code\like && elm-make.exe main.elm --yes",
                         UseShellExecute = false,
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
@@ -495,7 +500,9 @@ let main argv =
 
 
     let saveCommand = new KretschIT.WP_Fx.UI.Commands.RelayCommand(fun e -> messages.OnNext(SaveFile)  )
+//    let searchCommand = new KretschIT.WP_Fx.UI.Commands.RelayCommand(fun e -> messages.OnNext(Search)  )
     w.InputBindings.Add(new KeyBinding(saveCommand,Key.S,ModifierKeys.Control)) |> ignore
+//    w.InputBindings.Add(new KeyBinding(searchCommand,Key.F,ModifierKeys.Control)) |> ignore
 
     let textChanged = messages.Where(function | TextChanged _ -> true | _ -> false).Throttle(TimeSpan.FromSeconds(1.))
     //let commandOutputs = messages.Where(function | CommandOutput s -> true | _ -> false).Buffer(TimeSpan.FromSeconds(2.),DispatcherScheduler.Current).Select(fun b -> CommandOutputBuffered b )
@@ -507,27 +514,35 @@ let main argv =
                 match cmd with 
                 | TextChanged doc ->
                     let starize (t:String) = if t.EndsWith("*") then t else t+"*"
-                    {state with openFiles= List.map(fun (t,d) -> if d = doc then (starize t,d) else (t,d)) state.openFiles }      
+                    {state with openFiles= List.map(fun tstate -> if tstate.doc = doc then {tstate with path = starize tstate.path} else tstate) state.openFiles }      
                 | OpenFile s ->
                     let content = IO.File.ReadAllText(s)
                     let doc = new ICSharpCode.AvalonEdit.Document.TextDocument(content)
                     doc.FileName <- s
-                    {state with openFiles=state.openFiles@[(s,doc)] } 
+                    {state with openFiles=state.openFiles@[{path=s;doc=doc;search="";selectedText=[]}] } 
                 | SaveFile -> 
                     let unstarize (s:String) = s.Replace("*","")
-                    let (t,doc) = List.find (fun (t,doc) -> doc = state.current) state.openFiles
-                    IO.File.WriteAllText(doc.FileName,doc.Text)
+                    let tstate = List.find (fun tsate -> tsate.doc = state.current) state.openFiles
+                    IO.File.WriteAllText(tstate.doc.FileName,tstate.doc.Text)
 
                     for cmd in state.watches do 
-                        let cwd s = "cd " +  IO.Path.GetDirectoryName doc.FileName + ";" + s
-                        cmd.Replace("%currentpath%", doc.FileName) |> cwd |> run |> ignore
+                        let cwd s = "cd " +  IO.Path.GetDirectoryName tstate.doc.FileName + ";" + s
+                        cmd.Replace("%currentpath%", tstate.doc.FileName) |> cwd |> run |> ignore
 
-                    {state with openFiles= List.map(fun (t,d) -> if d = doc then (unstarize t,d) else (t,d)) state.openFiles }      
+                    {state with openFiles= List.map(fun tstate' -> if tstate.doc = tstate'.doc then {tstate' with path = unstarize tstate'.path} else tstate') state.openFiles }      
                 | CommandOutput s ->
                     {state with consoleOutput = s}
                 | DocSelected s ->
                     {state with current = s}
-                | other -> state  )
+                | ElementChanged (TextArea (s, id)) when id = "searchBox" ->
+                    let res = state.current.Text.IndexOf(s)
+                    if res > 0 then
+                        let tstate = List.find (fun tsate -> tsate.doc = state.current) state.openFiles
+                        {state with openFiles= List.map (fun tab -> if tab.doc = state.current then {tab with selectedText = [(res,s.Length)] } else tab ) state.openFiles }
+                    else state
+                | other -> 
+                    debug <| sprintf "not handled %A" other
+                    state  )
         .Scan((ui intialState,ui intialState), fun (prevdom,newdom) state -> (newdom,ui state) )
         .ObserveOnDispatcher()
         .Subscribe(function (p,c) -> w.Content <- List.head <| resolve [p] [c] [downcast w.Content]  )

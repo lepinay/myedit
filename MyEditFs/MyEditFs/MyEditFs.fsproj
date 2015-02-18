@@ -65,14 +65,6 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <Content Include="WP-Fx_License.txt" />
-    <None Include="..\..\ScintillaNET v2.6\SciLexer.dll">
-      <Link>SciLexer.dll</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="..\..\ScintillaNET v2.6\SciLexer64.dll">
-      <Link>SciLexer64.dll</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Accessibility" />
@@ -99,9 +91,6 @@
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
     <Reference Include="PresentationUI" />
-    <Reference Include="ScintillaNET">
-      <HintPath>..\..\ScintillaNET v2.6\ScintillaNET.dll</HintPath>
-    </Reference>
     <Reference Include="Simple.Wpf.Terminal">
       <HintPath>..\..\MyEdit\packages\Simple.Wpf.Terminal.1.33.0.0\lib\net40\Simple.Wpf.Terminal.dll</HintPath>
       <Private>True</Private>

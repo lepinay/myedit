@@ -24,6 +24,7 @@ open ICSharpCode.AvalonEdit.Folding
 open System.Diagnostics
 open ICSharpCode.AvalonEdit.Search
 open System.Windows.Shapes
+open System.Collections.Generic
 
 
 //#region helpers
@@ -86,7 +87,8 @@ and Command =
     | Search of string
     | SearchNext of string
 // TODO see before, elements should have their own commands
-and Element = 
+and 
+    Element = 
     | Docked of Element*Dock
     | Column of Element*int
     | Row of Element*int
@@ -312,21 +314,26 @@ let colors =
 
 type Cross = FsXaml.XAML<"cross.xaml", true>
 
-let rec render ui : UIElement = 
+let rec render ui (dict:Dictionary<Element,UIElement>) : UIElement = 
     let bgColor = new SolidColorBrush(Color.FromRgb (byte 39,byte 40,byte 34))
     let fgColor = new SolidColorBrush(Color.FromRgb (byte 248,byte 248,byte 242))
 
     match ui with
-        | Dock xs -> 
+        | Dock xs as dock -> 
             let d = new DockPanel(LastChildFill=true)
-            for x in xs do d.Children.Add (render x) |> ignore
+            for x in xs do d.Children.Add (render x dict) |> ignore
+            dict.Add(dock,d)
             d :> UIElement
-        | Terminal -> new Terminal() :> UIElement
-        | Tab xs -> 
+        | Terminal as term -> 
+            let t = new Terminal()
+            dict.Add(term,t)
+            t :> UIElement
+        | Tab xs as e -> 
             let d = new TabControl()            
             for x in xs do d.Items.Add (render x) |> ignore
+            dict.Add(e,d)
             d :> UIElement
-        | TabItem {title=title;element=e;onSelected=com;onClose=close;selected=selected} ->
+        | TabItem {title=title;element=e;onSelected=com;onClose=close;selected=selected} as te->
             let ti = new TabItem()
             ti.Content <- render e
             let closeButton = new Cross()
@@ -341,12 +348,14 @@ let rec render ui : UIElement =
                 | Option.None -> ()
             ti.Header <- closeButton
             ti.IsSelected <- selected
+            dict.Add(te,ti)
             ti :> UIElement
-        | Menu xs ->
+        | Menu xs as e->
             let m = new Menu()
             for x in xs do m.Items.Add (render x) |> ignore
+            dict.Add(e,m)
             m :> UIElement
-        | MenuItem (title,xs,actions,gestureText) -> 
+        | MenuItem (title,xs,actions,gestureText) as e-> 
             let mi = Controls.MenuItem(Header=title) 
             mi.InputGestureText <- gestureText
             for x in xs do mi.Items.Add(render x) |> ignore
@@ -354,41 +363,50 @@ let rec render ui : UIElement =
                 | [BrowseFile] -> mi.Click |> Observable.subscribe(fun e -> openFile()) |> ignore
                 | [SaveFile] -> mi.Click |> Observable.subscribe(fun e -> messages.OnNext(SaveFile)) |> ignore
                 | other -> ()
+            dict.Add(e,mi)
             mi :> UIElement
-        | Grid (cols,rows,xs) ->
+        | Grid (cols,rows,xs) as e->
             let g = new Grid()
             for row in rows do g.RowDefinitions.Add(new RowDefinition(Height=row))
             for col in cols do g.ColumnDefinitions.Add(new ColumnDefinition(Width=col))
-            for x in xs do g.Children.Add(render x) |> ignore
+            for x in xs do g.Children.Add(render x dict) |> ignore
+            dict.Add(e,g)
             g :> UIElement
-        | Docked (e,d) ->
-            let elt = render e
+        | Docked (e,d) as de ->
+            let elt = render e dict
             DockPanel.SetDock(elt,d)
+            dict.Add(de,elt)
             elt
-        | Column (e,d) ->
-            let elt = render e
+        | Column (e,d) as ce ->
+            let elt = render e dict
             Grid.SetColumn(elt,d)
+            dict.Add(ce,elt)
             elt
-        | Row (e,d) ->
-            let elt = render e
+        | Row (e,d) as re ->
+            let elt = render e dict
             Grid.SetRow(elt,d)
+            dict.Add(re,elt)
             elt
-        | Splitter Vertical ->
+        | Splitter Vertical as e ->
             let gs = new GridSplitter(VerticalAlignment=VerticalAlignment.Stretch,HorizontalAlignment=HorizontalAlignment.Center,ResizeDirection=GridResizeDirection.Columns,ShowsPreview=true,Width=5.)
+            dict.Add(e,gs)
             gs :> UIElement
-        | Splitter Horizontal ->
+        | Splitter Horizontal as e ->
             let gs = new GridSplitter(VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Stretch,ResizeDirection=GridResizeDirection.Rows,ShowsPreview=true,Height=5.)
+            dict.Add(e,gs)
             gs :> UIElement
-        | Tree xs ->
+        | Tree xs as e ->
             let t = new TreeView()
             for x in xs do t.Items.Add(render x) |> ignore
+            dict.Add(e,t)
             t :> UIElement
-        | TreeItem (title,xs) ->
+        | TreeItem (title,xs) as e ->
             let ti = new TreeViewItem()
             ti.Header <- title
             for x in xs do ti.Items.Add(render x) |> ignore
+            dict.Add(e,ti)
             ti :> UIElement
-        | Editor {doc=doc;selection=selection} ->
+        | Editor {doc=doc;selection=selection} as e ->
             let editor = new TextEditor();
 
             editor.SyntaxHighlighting <- HighlightingManager.Instance.GetDefinitionByExtension(IO.Path.GetExtension(doc.FileName));
@@ -411,9 +429,9 @@ let rec render ui : UIElement =
             foldingStrategy.UpdateFoldings(foldingManager, editor.Document);
 
             editor.Options.EnableRectangularSelection <- true
-
+            dict.Add(e,editor)
             editor :> UIElement
-        | TextArea {text=s;onTextChanged=textChanged;onReturn=returnKey} -> 
+        | TextArea {text=s;onTextChanged=textChanged;onReturn=returnKey} as e -> 
             let tb = new TextBox(Background = bgColor, Foreground = fgColor)
             tb.Text <- s
             tb.FontFamily <- FontFamily("Consolas")
@@ -423,10 +441,12 @@ let rec render ui : UIElement =
             match returnKey with
                 | Some(action) ->  tb.KeyDown |> Observable.subscribe(fun e -> action tb.Text)  |> ignore
                 | Option.None -> ()
+            dict.Add(e,tb)
             tb :> UIElement
-        | Scroll e ->
+        | Scroll e as se->
             let scroll = new ScrollViewer()
             scroll.Content <- render e
+            dict.Add(se,scroll)
             scroll :> UIElement
         | other -> failwith "not handled"
 
@@ -439,69 +459,75 @@ let itemsToList (coll:ItemCollection) =
 // Goal of this method is to avoid to call render as much as possible and instead reuse as much as already existing WPF controls between 
 // virtual dom changes
 // Calling render is expensive as it will create new control and trigger reflows
-let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) : UIElement list = 
-    if prev = curr then screen 
-    else 
-        match (prev,curr,screen) with
-            | (x::xs,y::ys,z::zs) when x = y -> z::resolve xs ys zs
-            | ((TabItem {title=ta;element=ea})::xs,(TabItem {title=tb;element=eb;selected=selb})::ys,z::zs) -> 
-                let ti = z :?> TabItem
-                let header = ti.Header :?> Cross
-                header.title.Text <- tb
-                ti.IsSelected <- selb
-                ti.Content <- List.head <| resolve [ea] [eb] [ti.Content :?> UIElement]
-                z::resolve xs ys zs
-            | ((Tab a)::xs,(Tab b)::ys,z::zs) -> 
-                let tab = z :?> TabControl     
-                let childrens = (itemsToList tab.Items)
-                tab.Items.Clear()
-                for c in resolve a b childrens do 
-                    tab.Items.Add(c) |> ignore
-                (tab :> UIElement)::resolve xs ys zs
-            | ((Dock a)::xs,(Dock b)::ys,z::zs) -> 
-                let dock = z :?> DockPanel     
-                let childrens = (collToList dock.Children)
-                dock.Children.Clear()
-                for c in resolve a b childrens do dock.Children.Add(c) |> ignore
-                (dock :> UIElement)::resolve xs ys zs
-            | ((Column (a,pa))::xs,(Column (b,pb))::ys,z::zs) when pa = pb -> resolve [a] [b] [z] @ resolve xs ys zs
-            | ((Row (a,pa))::xs,(Row (b,pb))::ys,z::zs) when pa = pb -> resolve [a] [b] [z] @ resolve xs ys zs
-            | ((Grid (acols,arows,a))::xs,(Grid (bcols,brows,b))::ys,z::zs) when acols = bcols && arows = brows -> 
-                let grid = z :?> Grid     
-                let childrens = (collToList grid.Children)
-                grid.Children.Clear()
-                for c in resolve a b childrens do grid.Children.Add(c) |> ignore
-                (grid :> UIElement)::resolve xs ys zs
-            | ((Editor {doc=tda;selection=sela})::xs,(Editor {doc=tdb;selection=selb})::ys,z::zs)  -> 
-                let editor = z :?> TextEditor
-                match selb with
-                    | [(s,e)] -> editor.Select(s,e)
-                    | [] -> editor.SelectionLength <- 0
-                    | multiselect -> ()
-                z::resolve xs ys zs
-            | ((Scroll a)::xs,(Scroll b)::ys,z::zs) -> 
-                let scroll = z :?> ScrollViewer
-                scroll.Content <- List.head <| resolve [a] [b] [scroll.Content :?> UIElement]
-                scroll.ScrollToBottom()
-                (scroll:>UIElement)::resolve xs ys zs
-            | ((TextArea {text=a})::xs,(TextArea {text=b})::ys,z::zs)  -> 
-                let tb = z :?> TextBox
-                tb.AppendText("\n"+b)
-                z::resolve xs ys zs
-            | ([],y::ys,[]) -> (render y)::resolve [] ys []
-            | ([],[],[]) -> []
+let rec resolve (prev:Element option) (curr:Element) (screen:Dictionary<Element,UIElement>) : UIElement = 
+    let remap preve curre ti = 
+//        screen.Remove(curre) |> ignore
+        screen.Remove(preve) |> ignore
+        screen.Add(curre,ti)
+        ti :> UIElement
+    let resolveChildrens previous childrens action = 
+        for c in childrens  do 
+            let oldme = previous |> List.tryFind (fun e -> c = e)
+            action(resolve oldme c screen) |> ignore
 
-            // UI element removed
-            | (x::xs,[],zs) -> 
-                // for z in zs do ??? what should we do when ui element are removed from the UI, right now they should be GCed
-                // will need to check w dont have memory leaks, speialy with all the event subscribers that could be still attached
-                // scary place here
-                []
+    match (prev,curr) with
+        | (Some prev,curr) when prev = curr ->  screen.[prev] 
+        | (Some(TabItem {title=ta;element=ea} as preve),(TabItem {title=tb;element=eb;selected=selb} as curre) ) -> 
+            let ti = screen.[preve] :?> TabItem
+            let header = ti.Header :?> Cross
+            header.title.Text <- tb
+            ti.IsSelected <- selb
+            ti.Content <- resolve (Some(ea)) eb screen
+            remap preve curre ti
+        | (Some(Tab a as preve) ,(Tab b as curre) ) -> 
+            let tab = screen.[preve] :?> TabControl     
+            tab.Items.Clear()
+            resolveChildrens a b tab.Items.Add
+            remap preve curre tab
+        | ((Dock a)::xs,(Dock b)::ys,z::zs) -> 
+            let dock = z :?> DockPanel     
+            let childrens = (collToList dock.Children)
+            dock.Children.Clear()
+            for c in resolve a b childrens do dock.Children.Add(c) |> ignore
+            (dock :> UIElement)::resolve xs ys zs
+        | ((Column (a,pa))::xs,(Column (b,pb))::ys,z::zs) when pa = pb -> resolve [a] [b] [z] @ resolve xs ys zs
+        | ((Row (a,pa))::xs,(Row (b,pb))::ys,z::zs) when pa = pb -> resolve [a] [b] [z] @ resolve xs ys zs
+        | ((Grid (acols,arows,a))::xs,(Grid (bcols,brows,b))::ys,z::zs) when acols = bcols && arows = brows -> 
+            let grid = z :?> Grid     
+            let childrens = (collToList grid.Children)
+            grid.Children.Clear()
+            for c in resolve a b childrens do grid.Children.Add(c) |> ignore
+            (grid :> UIElement)::resolve xs ys zs
+        | ((Editor {doc=tda;selection=sela})::xs,(Editor {doc=tdb;selection=selb})::ys,z::zs)  -> 
+            let editor = z :?> TextEditor
+            match selb with
+                | [(s,e)] -> editor.Select(s,e)
+                | [] -> editor.SelectionLength <- 0
+                | multiselect -> ()
+            z::resolve xs ys zs
+        | ((Scroll a)::xs,(Scroll b)::ys,z::zs) -> 
+            let scroll = z :?> ScrollViewer
+            scroll.Content <- List.head <| resolve [a] [b] [scroll.Content :?> UIElement]
+            scroll.ScrollToBottom()
+            (scroll:>UIElement)::resolve xs ys zs
+        | ((TextArea {text=a})::xs,(TextArea {text=b})::ys,z::zs)  -> 
+            let tb = z :?> TextBox
+            tb.AppendText("\n"+b)
+            z::resolve xs ys zs
+        | ([],y::ys,[]) -> (render y)::resolve [] ys []
+        | ([],[],[]) -> []
+
+        // UI element removed
+        | (x::xs,[],zs) -> 
+            // for z in zs do ??? what should we do when ui element are removed from the UI, right now they should be GCed
+            // will need to check w dont have memory leaks, speialy with all the event subscribers that could be still attached
+            // scary place here
+            []
             
-            | (_,y::ys,_) -> 
-                failwith <| sprintf "unable to reuse from %A" y
-                (render y)::resolve [] ys []
-            | other -> failwith <| sprintf "not handled:\nPREV\n%A\nCURR\n%A\nSCREEN\n%A" prev curr screen
+        | (_,y::ys,_) -> 
+            failwith <| sprintf "unable to reuse from %A" y
+            (render y)::resolve [] ys []
+        | other -> failwith <| sprintf "not handled:\nPREV\n%A\nCURR\n%A\nSCREEN\n%A" prev curr screen
 
 // elm-make main.elm --yes
 let intialState = {

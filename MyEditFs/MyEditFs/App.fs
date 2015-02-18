@@ -22,6 +22,7 @@ open System.Reactive.Concurrency
 open System.Windows.Input
 open ICSharpCode.AvalonEdit.Folding
 open System.Diagnostics
+open ICSharpCode.AvalonEdit.Search
 
 
 //#region helpers
@@ -34,6 +35,22 @@ type EditorElement =
     { doc: TextDocument;
       selection: (int*int)list } 
 
+[<CustomEquality; CustomComparison>]
+type TextAreaElement =
+    { text: string;
+      onReturn : (string -> unit) option
+      onTextChanged : (string -> unit) option } 
+    override x.Equals(yobj) =
+        match yobj with
+        | :? TextAreaElement as y -> x.text = y.text
+        | _ -> false
+ 
+    override x.GetHashCode() = hash x.text
+    interface System.IComparable with
+      member x.CompareTo yobj =
+          match yobj with
+          | :? TextAreaElement as y -> compare x.text y.text
+          | _ -> invalidArg "yobj" "cannot compare values of different types"
 
 // http://blogs.msdn.com/b/dsyme/archive/2009/11/08/equality-and-comparison-constraints-in-f-1-9-7.aspx
 // TODO separate pure UI command from application business commands
@@ -45,7 +62,8 @@ type Command =
     | TextChanged of TextDocument
     | CommandOutput of string
     | DocSelected of TextDocument
-    | ElementChanged of Element
+    | Search of string
+    | SearchNext of string
 // TODO see before, elements should have their own commands
 and Element = 
     | Docked of Element*Dock
@@ -61,7 +79,7 @@ and Element =
     | TreeItem of Title*Element list
     | Editor of EditorElement
     | TabItem of (String*Element*Command)
-    | TextArea of string*string
+    | TextArea of TextAreaElement
     | Tab of Element list
     | Scroll of Element
 
@@ -108,7 +126,7 @@ let saveFile () =
 // We could optimize this by diffing the state to the previous state and generate only the updated dom
 // like we already do for the Dom to WPF transformation
 let ui (state:EditorState) = 
-    let tabs = state.openFiles |> List.map (fun state -> TabItem (IO.Path.GetFileName(state.path),Dock[Docked(TextArea (state.search,"searchBox"),Dock.Top);Editor {doc=state.doc;selection=state.selectedText}], DocSelected state.doc) )
+    let tabs = state.openFiles |> List.map (fun state -> TabItem (IO.Path.GetFileName(state.path),Dock[Docked(TextArea {text=state.search;onTextChanged=Some(fun s -> messages.OnNext(Search s));onReturn=Some(fun s -> messages.OnNext(SearchNext s)) },Dock.Top);Editor {doc=state.doc;selection=state.selectedText}], DocSelected state.doc) )
     let rec makeTree = function
         | None -> []
         | Directory (p, folders, files) -> 
@@ -131,7 +149,7 @@ let ui (state:EditorState) =
                             [
                                 Row(Tab tabs,0)
                                 Row(Splitter Horizontal,1)
-                                Row(Scroll(TextArea (state.consoleOutput,"")),2)
+                                Row(Scroll(TextArea {text = state.consoleOutput;onTextChanged = Option.None;onReturn = Option.None}),2)
                             ]),2)
                 ])
     ]
@@ -222,6 +240,8 @@ let rec render ui : UIElement =
             editor.Options.ConvertTabsToSpaces <- true
             editor.Options.EnableHyperlinks <- false
             editor.Options.ShowColumnRuler <- true
+            SearchPanel.Install(editor) |> ignore
+
 
             let foldingManager = FoldingManager.Install(editor.TextArea);
             let foldingStrategy = new XmlFoldingStrategy();
@@ -230,11 +250,16 @@ let rec render ui : UIElement =
             editor.Options.EnableRectangularSelection <- true
 
             editor :> UIElement
-        | TextArea (s, id) -> 
+        | TextArea {text=s;onTextChanged=textChanged;onReturn=returnKey} -> 
             let tb = new TextBox(Background = bgColor, Foreground = fgColor)
             tb.Text <- s
             tb.FontFamily <- FontFamily("Consolas")
-            if id <> "" then tb. TextChanged |> Observable.subscribe(fun e -> messages.OnNext(ElementChanged <|TextArea (tb.Text, id)) ) |> ignore
+            match textChanged with
+                | Some(action) ->  tb.TextChanged |> Observable.subscribe(fun e -> action tb.Text)  |> ignore
+                | Option.None -> ()
+            match returnKey with
+                | Some(action) ->  tb.KeyDown |> Observable.subscribe(fun e -> action tb.Text)  |> ignore
+                | Option.None -> ()
             tb :> UIElement
         | Scroll e ->
             let scroll = new ScrollViewer()
@@ -292,7 +317,7 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
                 scroll.Content <- List.head <| resolve [a] [b] [scroll.Content :?> UIElement]
                 scroll.ScrollToBottom()
                 (scroll:>UIElement)::resolve xs ys zs
-            | ((TextArea (a,ida))::xs,(TextArea (b,idb))::ys,z::zs)  -> 
+            | ((TextArea {text=a})::xs,(TextArea {text=b})::ys,z::zs)  -> 
                 let tb = z :?> TextBox
                 tb.AppendText("\n"+b)
                 z::resolve xs ys zs
@@ -539,12 +564,22 @@ let main argv =
                     {state with consoleOutput = s}
                 | DocSelected s ->
                     {state with current = s}
-                | ElementChanged (TextArea (s, id)) when id = "searchBox" ->
+                | Search s ->
                     let res = state.current.Text.IndexOf(s)
                     if res >= 0 then
                         let tstate = List.find (fun tsate -> tsate.doc = state.current) state.openFiles
                         {state with openFiles= List.map (fun tab -> if tab.doc = state.current then {tab with selectedText = [(res,s.Length)] } else tab ) state.openFiles }
                     else state
+                | SearchNext s ->
+                    let tstate = List.find (fun tsate -> tsate.doc = state.current) state.openFiles
+                    match tstate.selectedText with
+                        | [(idx,len)] ->
+                            let res = state.current.Text.IndexOf(s,idx+len)
+                            if res >= 0 then
+                                let tstate = List.find (fun tsate -> tsate.doc = state.current) state.openFiles
+                                {state with openFiles= List.map (fun tab -> if tab.doc = state.current then {tab with selectedText = [(res,s.Length)] } else tab ) state.openFiles }
+                            else state
+                        | other -> state
                 | other -> 
                     debug <| sprintf "not handled %A" other
                     state  )

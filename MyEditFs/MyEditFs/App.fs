@@ -465,14 +465,14 @@ let intialState = {
     }
 
 
-let myHost = new MyHost(fun s -> 
-    Application.Current.Dispatcher.InvokeAsync(
-        fun () ->
-            debug s
-            messages.OnNext <| CommandOutput s) |> ignore
-    )
-let myRunSpace = RunspaceFactory.CreateRunspace(myHost);
-myRunSpace.Open();
+//let myHost = new MyHost(fun s -> 
+//    Application.Current.Dispatcher.InvokeAsync(
+//        fun () ->
+//            debug s
+//            messages.OnNext <| CommandOutput s) |> ignore
+//    )
+//let myRunSpace = RunspaceFactory.CreateRunspace(myHost);
+//myRunSpace.Open();
 
 let run (script:string) = 
     Task.Run 

@@ -127,7 +127,7 @@ type EditorState = {
 
 
 let messages = new Reactive.Subjects.Subject<Command>()
-let debug s = messages.OnNext <| CommandOutput s
+let debug s = messages.OnNext <| CommandOutput (sprintf "[%A] %s:" DateTime.Now s)
 
 let openFile () = 
     let dlg = new Microsoft.Win32.OpenFileDialog();
@@ -151,7 +151,7 @@ let saveFile () =
 let ui (state:EditorState) = 
     let filesToTabs docState = 
         TabItem {
-            id=docState.path
+            id=docState.doc.FileName
             title=IO.Path.GetFileName(docState.path)
             selected = state.current = docState.doc
             element=Dock
@@ -316,6 +316,7 @@ let colors =
 type Cross = FsXaml.XAML<"cross.xaml", true>
 
 let rec render ui : UIElement = 
+
     let bgColor = new SolidColorBrush(Color.FromRgb (byte 39,byte 40,byte 34))
     let fgColor = new SolidColorBrush(Color.FromRgb (byte 248,byte 248,byte 242))
 
@@ -494,7 +495,9 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
                 let tb = z :?> TextBox
                 tb.AppendText("\n"+b)
                 z::resolve xs ys zs
-            | ([],y::ys,[]) -> (render y)::resolve [] ys []
+            | ([],y::ys,[]) -> 
+                debug <| sprintf "render %A" y 
+                (render y)::resolve [] ys []
             | ([],[],[]) -> []
 
             // UI element removed

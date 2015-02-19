@@ -314,141 +314,160 @@ let colors =
 
 type Cross = FsXaml.XAML<"cross.xaml", true>
 
-let rec render ui (dict:Dictionary<Element,UIElement>) : UIElement = 
+let rec render (parent:UIElement) ui (dict:Dictionary<Element,UIElement*UIElement>) : UIElement*UIElement = 
     let bgColor = new SolidColorBrush(Color.FromRgb (byte 39,byte 40,byte 34))
     let fgColor = new SolidColorBrush(Color.FromRgb (byte 248,byte 248,byte 242))
 
-    match ui with
-        | Dock xs as dock -> 
-            let d = new DockPanel(LastChildFill=true)
-            for x in xs do d.Children.Add (render x dict) |> ignore
-            dict.Add(dock,d)
-            d :> UIElement
-        | Terminal as term -> 
-            let t = new Terminal()
-            dict.Add(term,t)
-            t :> UIElement
-        | Tab xs as e -> 
-            let d = new TabControl()            
-            for x in xs do d.Items.Add (render x) |> ignore
-            dict.Add(e,d)
-            d :> UIElement
-        | TabItem {title=title;element=e;onSelected=com;onClose=close;selected=selected} as te->
-            let ti = new TabItem()
-            ti.Content <- render e
-            let closeButton = new Cross()
-            closeButton.title.Text <- title
-            closeButton.title.MouseLeftButtonDown
-                |> Observable.subscribe(fun e ->
-                    match com with 
-                        | Some(tag) -> tag() |> ignore 
-                        | Option.None -> ()) |> ignore
-            match close with
-                | Some(close) -> closeButton.closeButton.Click |> Observable.subscribe(fun e -> close()) |> ignore
-                | Option.None -> ()
-            ti.Header <- closeButton
-            ti.IsSelected <- selected
-            dict.Add(te,ti)
-            ti :> UIElement
-        | Menu xs as e->
-            let m = new Menu()
-            for x in xs do m.Items.Add (render x) |> ignore
-            dict.Add(e,m)
-            m :> UIElement
-        | MenuItem (title,xs,actions,gestureText) as e-> 
-            let mi = Controls.MenuItem(Header=title) 
-            mi.InputGestureText <- gestureText
-            for x in xs do mi.Items.Add(render x) |> ignore
-            match actions with 
-                | [BrowseFile] -> mi.Click |> Observable.subscribe(fun e -> openFile()) |> ignore
-                | [SaveFile] -> mi.Click |> Observable.subscribe(fun e -> messages.OnNext(SaveFile)) |> ignore
-                | other -> ()
-            dict.Add(e,mi)
-            mi :> UIElement
-        | Grid (cols,rows,xs) as e->
-            let g = new Grid()
-            for row in rows do g.RowDefinitions.Add(new RowDefinition(Height=row))
-            for col in cols do g.ColumnDefinitions.Add(new ColumnDefinition(Width=col))
-            for x in xs do g.Children.Add(render x dict) |> ignore
-            dict.Add(e,g)
-            g :> UIElement
-        | Docked (e,d) as de ->
-            let elt = render e dict
-            DockPanel.SetDock(elt,d)
-            dict.Add(de,elt)
-            elt
-        | Column (e,d) as ce ->
-            let elt = render e dict
-            Grid.SetColumn(elt,d)
-            dict.Add(ce,elt)
-            elt
-        | Row (e,d) as re ->
-            let elt = render e dict
-            Grid.SetRow(elt,d)
-            dict.Add(re,elt)
-            elt
-        | Splitter Vertical as e ->
-            let gs = new GridSplitter(VerticalAlignment=VerticalAlignment.Stretch,HorizontalAlignment=HorizontalAlignment.Center,ResizeDirection=GridResizeDirection.Columns,ShowsPreview=true,Width=5.)
-            dict.Add(e,gs)
-            gs :> UIElement
-        | Splitter Horizontal as e ->
-            let gs = new GridSplitter(VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Stretch,ResizeDirection=GridResizeDirection.Rows,ShowsPreview=true,Height=5.)
-            dict.Add(e,gs)
-            gs :> UIElement
-        | Tree xs as e ->
-            let t = new TreeView()
-            for x in xs do t.Items.Add(render x) |> ignore
-            dict.Add(e,t)
-            t :> UIElement
-        | TreeItem (title,xs) as e ->
-            let ti = new TreeViewItem()
-            ti.Header <- title
-            for x in xs do ti.Items.Add(render x) |> ignore
-            dict.Add(e,ti)
-            ti :> UIElement
-        | Editor {doc=doc;selection=selection} as e ->
-            let editor = new TextEditor();
+    let leave (p:UIElement) c = 
+        match p with
+        | :? DockPanel as dock -> dock.Children.Remove(c)
 
-            editor.SyntaxHighlighting <- HighlightingManager.Instance.GetDefinitionByExtension(IO.Path.GetExtension(doc.FileName));
-            editor.Document <- doc;
-            editor.FontFamily <- FontFamily("Consolas")
-            editor.TextChanged |> Observable.subscribe(fun e -> messages.OnNext(TextChanged doc)  ) |> ignore
-            editor.ShowLineNumbers <- true
-            editor.Background <- bgColor
-            editor.Foreground <- fgColor
-            editor.Options.ConvertTabsToSpaces <- true
-            editor.Options.EnableHyperlinks <- false
-            editor.Options.ShowColumnRuler <- true
-            let sp = SearchPanel.Install(editor)
-            let brush = colors.["FindHighlight"]
-            sp.MarkerBrush  <- brush.GetBrush(null)
+    let join (p:UIElement) c = 
+        match p with
+        | :? DockPanel as dock -> dock.Children.Add(c)
 
 
-            let foldingManager = FoldingManager.Install(editor.TextArea);
-            let foldingStrategy = new XmlFoldingStrategy();
-            foldingStrategy.UpdateFoldings(foldingManager, editor.Document);
+    match dict.TryGetValue(ui) with
+        | (true,(cparent,me)) when cparent <> parent -> 
+            leave cparent me
+            join parent me |> ignore
+            dict.[ui] <- (parent,me)
+            (parent,me)
+        | (true,me)  -> me
+        | (false,_) ->  
+            match ui with
+                | Dock xs as dock -> 
+                    let d = new DockPanel(LastChildFill=true)
+                
+                    for x in xs do 
+                        d.Children.Add (render d x dict) |> ignore
+                    dict.Add(dock,(parent,d))
+                    (parent,d) :> UIElement
+                | Terminal as term -> 
+                    let t = new Terminal()
+                    dict.Add(term,t)
+                    t :> UIElement
+                | Tab xs as e -> 
+                    let d = new TabControl()            
+                    for x in xs do d.Items.Add (render x dict) |> ignore
+                    dict.Add(e,d)
+                    d :> UIElement
+                | TabItem {title=title;element=e;onSelected=com;onClose=close;selected=selected} as te->
+                    let ti = new TabItem()
+                    ti.Content <- render e dict
+                    let closeButton = new Cross()
+                    closeButton.title.Text <- title
+                    closeButton.title.MouseLeftButtonDown
+                        |> Observable.subscribe(fun e ->
+                            match com with 
+                                | Some(tag) -> tag() |> ignore 
+                                | Option.None -> ()) |> ignore
+                    match close with
+                        | Some(close) -> closeButton.closeButton.Click |> Observable.subscribe(fun e -> close()) |> ignore
+                        | Option.None -> ()
+                    ti.Header <- closeButton
+                    ti.IsSelected <- selected
+                    dict.Add(te,ti)
+                    ti :> UIElement
+                | Menu xs as e->
+                    let m = new Menu()
+                    for x in xs do m.Items.Add (render x dict) |> ignore
+                    dict.Add(e,m)
+                    m :> UIElement
+                | MenuItem (title,xs,actions,gestureText) as e-> 
+                    let mi = Controls.MenuItem(Header=title) 
+                    mi.InputGestureText <- gestureText
+                    for x in xs do mi.Items.Add(render x dict) |> ignore
+                    match actions with 
+                        | [BrowseFile] -> mi.Click |> Observable.subscribe(fun e -> openFile()) |> ignore
+                        | [SaveFile] -> mi.Click |> Observable.subscribe(fun e -> messages.OnNext(SaveFile)) |> ignore
+                        | other -> ()
+                    dict.Add(e,mi)
+                    mi :> UIElement
+                | Grid (cols,rows,xs) as e->
+                    let g = new Grid()
+                    for row in rows do g.RowDefinitions.Add(new RowDefinition(Height=row))
+                    for col in cols do g.ColumnDefinitions.Add(new ColumnDefinition(Width=col))
+                    for x in xs do g.Children.Add(render x dict) |> ignore
+                    dict.Add(e,g)
+                    g :> UIElement
+                | Docked (e,d) as de ->
+                    let elt = render e dict
+                    DockPanel.SetDock(elt,d)
+                    dict.Add(de,elt)
+                    elt
+                | Column (e,d) as ce ->
+                    let elt = render e dict
+                    Grid.SetColumn(elt,d)
+                    dict.Add(ce,elt)
+                    elt
+                | Row (e,d) as re ->
+                    let elt = render e dict
+                    Grid.SetRow(elt,d)
+                    dict.Add(re,elt)
+                    elt
+                | Splitter Vertical as e ->
+                    let gs = new GridSplitter(VerticalAlignment=VerticalAlignment.Stretch,HorizontalAlignment=HorizontalAlignment.Center,ResizeDirection=GridResizeDirection.Columns,ShowsPreview=true,Width=5.)
+                    dict.Add(e,gs)
+                    gs :> UIElement
+                | Splitter Horizontal as e ->
+                    let gs = new GridSplitter(VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Stretch,ResizeDirection=GridResizeDirection.Rows,ShowsPreview=true,Height=5.)
+                    dict.Add(e,gs)
+                    gs :> UIElement
+                | Tree xs as e ->
+                    let t = new TreeView()
+                    for x in xs do t.Items.Add(render x dict) |> ignore
+                    dict.Add(e,t)
+                    t :> UIElement
+                | TreeItem (title,xs) as e ->
+                    let ti = new TreeViewItem()
+                    ti.Header <- title
+                    for x in xs do ti.Items.Add(render x dict) |> ignore
+                    dict.Add(e,ti)
+                    ti :> UIElement
+                | Editor {doc=doc;selection=selection} as e ->
+                    let editor = new TextEditor();
 
-            editor.Options.EnableRectangularSelection <- true
-            dict.Add(e,editor)
-            editor :> UIElement
-        | TextArea {text=s;onTextChanged=textChanged;onReturn=returnKey} as e -> 
-            let tb = new TextBox(Background = bgColor, Foreground = fgColor)
-            tb.Text <- s
-            tb.FontFamily <- FontFamily("Consolas")
-            match textChanged with
-                | Some(action) ->  tb.TextChanged |> Observable.subscribe(fun e -> action tb.Text)  |> ignore
-                | Option.None -> ()
-            match returnKey with
-                | Some(action) ->  tb.KeyDown |> Observable.subscribe(fun e -> action tb.Text)  |> ignore
-                | Option.None -> ()
-            dict.Add(e,tb)
-            tb :> UIElement
-        | Scroll e as se->
-            let scroll = new ScrollViewer()
-            scroll.Content <- render e
-            dict.Add(se,scroll)
-            scroll :> UIElement
-        | other -> failwith "not handled"
+                    editor.SyntaxHighlighting <- HighlightingManager.Instance.GetDefinitionByExtension(IO.Path.GetExtension(doc.FileName));
+                    editor.Document <- doc;
+                    editor.FontFamily <- FontFamily("Consolas")
+                    editor.TextChanged |> Observable.subscribe(fun e -> messages.OnNext(TextChanged doc)  ) |> ignore
+                    editor.ShowLineNumbers <- true
+                    editor.Background <- bgColor
+                    editor.Foreground <- fgColor
+                    editor.Options.ConvertTabsToSpaces <- true
+                    editor.Options.EnableHyperlinks <- false
+                    editor.Options.ShowColumnRuler <- true
+                    let sp = SearchPanel.Install(editor)
+                    let brush = colors.["FindHighlight"]
+                    sp.MarkerBrush  <- brush.GetBrush(null)
+
+
+                    let foldingManager = FoldingManager.Install(editor.TextArea);
+                    let foldingStrategy = new XmlFoldingStrategy();
+                    foldingStrategy.UpdateFoldings(foldingManager, editor.Document);
+
+                    editor.Options.EnableRectangularSelection <- true
+                    dict.Add(e,editor)
+                    editor :> UIElement
+                | TextArea {text=s;onTextChanged=textChanged;onReturn=returnKey} as e -> 
+                    let tb = new TextBox(Background = bgColor, Foreground = fgColor)
+                    tb.Text <- s
+                    tb.FontFamily <- FontFamily("Consolas")
+                    match textChanged with
+                        | Some(action) ->  tb.TextChanged |> Observable.subscribe(fun e -> action tb.Text)  |> ignore
+                        | Option.None -> ()
+                    match returnKey with
+                        | Some(action) ->  tb.KeyDown |> Observable.subscribe(fun e -> action tb.Text)  |> ignore
+                        | Option.None -> ()
+                    dict.Add(e,tb)
+                    tb :> UIElement
+                | Scroll e as se->
+                    let scroll = new ScrollViewer()
+                    scroll.Content <- render e dict
+                    dict.Add(se,scroll)
+                    scroll :> UIElement
+                | other -> failwith "not handled"
 
 let collToList (coll:UIElementCollection) : UIElement list =
     seq { for c in coll -> c } |> Seq.toList
@@ -465,10 +484,13 @@ let rec resolve (prev:Element option) (curr:Element) (screen:Dictionary<Element,
         screen.Remove(preve) |> ignore
         screen.Add(curre,ti)
         ti :> UIElement
-    let resolveChildrens previous childrens action = 
+    let resolveChildrens (childrens:Element seq) (action:UIElement ->'a) = 
         for c in childrens  do 
-            let oldme = previous |> List.tryFind (fun e -> c = e)
-            action(resolve oldme c screen) |> ignore
+            let (found,oldme) = screen.TryGetValue(c)
+            if found then action(oldme) |> ignore
+            else 
+                let newMe = resolve Option.None c screen
+                action(newMe) |> ignore
 
     match (prev,curr) with
         | (Some prev,curr) when prev = curr ->  screen.[prev] 
@@ -482,51 +504,41 @@ let rec resolve (prev:Element option) (curr:Element) (screen:Dictionary<Element,
         | (Some(Tab a as preve) ,(Tab b as curre) ) -> 
             let tab = screen.[preve] :?> TabControl     
             tab.Items.Clear()
-            resolveChildrens a b tab.Items.Add
+            resolveChildrens b tab.Items.Add
             remap preve curre tab
-        | ((Dock a)::xs,(Dock b)::ys,z::zs) -> 
-            let dock = z :?> DockPanel     
-            let childrens = (collToList dock.Children)
+        | (Some(Dock a as preve),(Dock b as curre)) -> 
+            let dock = screen.[preve] :?> DockPanel     
             dock.Children.Clear()
-            for c in resolve a b childrens do dock.Children.Add(c) |> ignore
-            (dock :> UIElement)::resolve xs ys zs
-        | ((Column (a,pa))::xs,(Column (b,pb))::ys,z::zs) when pa = pb -> resolve [a] [b] [z] @ resolve xs ys zs
-        | ((Row (a,pa))::xs,(Row (b,pb))::ys,z::zs) when pa = pb -> resolve [a] [b] [z] @ resolve xs ys zs
-        | ((Grid (acols,arows,a))::xs,(Grid (bcols,brows,b))::ys,z::zs) when acols = bcols && arows = brows -> 
-            let grid = z :?> Grid     
-            let childrens = (collToList grid.Children)
+            resolveChildrens b dock.Children.Add
+            remap preve curre dock
+        | (Some(Column (a,pa)),(Column (b,pb))) when pa = pb -> resolve (Some a) b screen
+        | (Some(Row (a,pa)),(Row (b,pb))) when pa = pb -> resolve (Some a) b screen
+        | (Some(Grid (acols,arows,a) as preve),(Grid (bcols,brows,b) as curre)) when acols = bcols && arows = brows -> 
+            let grid = screen.[preve] :?> Grid     
             grid.Children.Clear()
-            for c in resolve a b childrens do grid.Children.Add(c) |> ignore
-            (grid :> UIElement)::resolve xs ys zs
-        | ((Editor {doc=tda;selection=sela})::xs,(Editor {doc=tdb;selection=selb})::ys,z::zs)  -> 
-            let editor = z :?> TextEditor
+            resolveChildrens b grid.Children.Add
+            remap preve curre grid
+        | (Some(Editor {doc=tda;selection=sela} as preve),(Editor {doc=tdb;selection=selb} as curre))  -> 
+            let editor = screen.[preve] :?> TextEditor
             match selb with
                 | [(s,e)] -> editor.Select(s,e)
                 | [] -> editor.SelectionLength <- 0
                 | multiselect -> ()
-            z::resolve xs ys zs
-        | ((Scroll a)::xs,(Scroll b)::ys,z::zs) -> 
-            let scroll = z :?> ScrollViewer
-            scroll.Content <- List.head <| resolve [a] [b] [scroll.Content :?> UIElement]
+            remap preve curre editor
+        | (Some(Scroll a as preve),(Scroll b as curre)) -> 
+            let scroll = screen.[preve] :?> ScrollViewer
+            scroll.Content <- resolve (Some preve) b screen
             scroll.ScrollToBottom()
-            (scroll:>UIElement)::resolve xs ys zs
-        | ((TextArea {text=a})::xs,(TextArea {text=b})::ys,z::zs)  -> 
-            let tb = z :?> TextBox
+            remap preve curre scroll
+        | (Some(TextArea {text=a} as preve),(TextArea {text=b} as curre))  -> 
+            let tb = screen.[preve] :?> TextBox
             tb.AppendText("\n"+b)
-            z::resolve xs ys zs
-        | ([],y::ys,[]) -> (render y)::resolve [] ys []
-        | ([],[],[]) -> []
-
-        // UI element removed
-        | (x::xs,[],zs) -> 
-            // for z in zs do ??? what should we do when ui element are removed from the UI, right now they should be GCed
-            // will need to check w dont have memory leaks, speialy with all the event subscribers that could be still attached
-            // scary place here
-            []
+            remap preve curre tb
+        | (Option.None,y) -> render y screen
             
-        | (_,y::ys,_) -> 
-            failwith <| sprintf "unable to reuse from %A" y
-            (render y)::resolve [] ys []
+        | (Some x,y) -> 
+            failwith <| sprintf "unable to reuse from %A" x
+            render y screen
         | other -> failwith <| sprintf "not handled:\nPREV\n%A\nCURR\n%A\nSCREEN\n%A" prev curr screen
 
 // elm-make main.elm --yes
@@ -613,9 +625,10 @@ let main argv =
 
 
     let w =  new Window(Title="F# is fun!",Width=260., Height=420.)
+    let screen = Dictionary<Element,UIElement>()
     w.WindowState <- WindowState.Maximized
     w.Show()
-    w.Content <- List.head <| resolve [] [ui intialState] [] 
+    w.Content <- render (ui intialState) screen
 
 
     let saveCommand = new KretschIT.WP_Fx.UI.Commands.RelayCommand(fun e -> messages.OnNext(SaveFile)  )
@@ -676,7 +689,7 @@ let main argv =
                     state  )
         .Scan((ui intialState,ui intialState), fun (prevdom,newdom) state -> (newdom,ui state) )
         .ObserveOnDispatcher()
-        .Subscribe(function (p,c) -> w.Content <- List.head <| resolve [p] [c] [downcast w.Content]  )
+        .Subscribe(function (p,c) -> w.Content <- render c screen  )
         |>ignore
 
     let app = new Application()

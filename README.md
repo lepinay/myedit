@@ -10,16 +10,21 @@ This is a **proof of concept** to see how hard it would be to write a code edito
 #Why
 Why am I writing my own code editor ?
 
-* It's a fun exercise
+* It's a fun exercise (learn some f#,frp,wpf)
 * I like to learn different programming lanugages but I have not yet found lightweight windows code editor
 * Lightweight to me mean: fast to start, reactive UI, bare minimun features
 * I want multi row tabs
 * I want an embeded command shell
 * I want to be able to trigger script on file change and set that up EASILY
 
+
 # History
 
 This is where we have a fun and see how the baby is growing :smiley:
+
+## Version 6
+Ability to close tabs (Thanks to [fsxaml](https://github.com/fsprojects/FsXaml), it's a real pleasure to work with static xaml in fs)
+![shot](/Versions/6.gif) 
 
 ## Version 5
 

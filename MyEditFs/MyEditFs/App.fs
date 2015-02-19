@@ -55,7 +55,9 @@ type TextAreaElement =
 
 [<CustomEquality; CustomComparison>]
 type TabItemElement =
-    { title: string
+    { 
+      id:string
+      title: string
       selected:bool
       element: Element
       onSelected : (unit -> unit) option
@@ -149,6 +151,7 @@ let saveFile () =
 let ui (state:EditorState) = 
     let filesToTabs docState = 
         TabItem {
+            id=docState.path
             title=IO.Path.GetFileName(docState.path)
             selected = state.current = docState.doc
             element=Dock
@@ -444,13 +447,16 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
     else 
         match (prev,curr,screen) with
             | (x::xs,y::ys,z::zs) when x = y -> z::resolve xs ys zs
-            | ((TabItem {title=ta;element=ea})::xs,(TabItem {title=tb;element=eb;selected=selb})::ys,z::zs) -> 
+            | ((TabItem {title=ta;element=ea;id=ida})::xs,(TabItem {title=tb;element=eb;selected=selb;id=idb})::ys,z::zs) when ida = idb -> 
                 let ti = z :?> TabItem
                 let header = ti.Header :?> Cross
                 header.title.Text <- tb
                 ti.IsSelected <- selb
                 ti.Content <- List.head <| resolve [ea] [eb] [ti.Content :?> UIElement]
+
+                // This won't handle the case where tabs were reordered since ys wont' have chance to go again trought all xs !
                 z::resolve xs ys zs
+            | ((TabItem {id=ida})::xs,(TabItem {id=idb} as y)::ys,z::zs) when ida <> idb -> resolve xs (y::ys) zs
             | ((Tab a)::xs,(Tab b)::ys,z::zs) -> 
                 let tab = z :?> TabControl     
                 let childrens = (itemsToList tab.Items)
@@ -612,7 +618,7 @@ let main argv =
                     let content = IO.File.ReadAllText(s)
                     let doc = new ICSharpCode.AvalonEdit.Document.TextDocument(content)
                     doc.FileName <- s
-                    {state with openFiles=state.openFiles@[{path=s;doc=doc;search="";selectedText=[]}] } 
+                    {state with current=doc; openFiles=state.openFiles@[{path=s;doc=doc;search="";selectedText=[]}] } 
                 | SaveFile -> 
                     let unstarize (s:String) = s.Replace("*","")
                     let tstate = List.find (fun tsate -> tsate.doc = state.current) state.openFiles

@@ -23,14 +23,17 @@ Why am I writing my own code editor ?
 This is where we have a fun and see how the baby is growing :smiley:
 
 ## Version 6
-Ability to close tabs (Thanks to [fsxaml](https://github.com/fsprojects/FsXaml), it's a real pleasure to work with static xaml in fs)
+
+- Ability to close tabs (Thanks to [fsxaml](https://github.com/fsprojects/FsXaml), it's a real pleasure to work with static xaml in fs)
+- Ability to search text
+
 ![shot](/Versions/6.gif) 
 
 ## Version 5
 
-Monokai theme (Elm only, hard coded)
-Elm syntax 
-Build on save (Hard coded)
+- Monokai theme (Elm only, hard coded)
+- Elm syntax 
+- Build on save (Hard coded)
 
 Folder browser is broken, will fix in next version
 

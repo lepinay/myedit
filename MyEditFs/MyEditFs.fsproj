@@ -60,6 +60,8 @@
   </Choose>
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
+    <Compile Include="Dom.fs" />
+    <Compile Include="Wpf.fs" />
     <Compile Include="App.fs" />
     <Content Include="App.config" />
     <Content Include="packages.config" />

@@ -33,12 +33,47 @@ type Row = GridLength
 type Title = String
 type SplitterDirection = Horizontal | Vertical
 
-type EditorElement =
+type Element = 
+    | Docked of Element*Dock
+    | Column of Element*int
+    | Row of Element*int
+    | Dock of Element list
+    | Menu of Element list
+    | MenuItem of MenuItemElement
+    | Grid of Column list*Row list*Element list
+    | Splitter of SplitterDirection
+    | Terminal
+    | Tree of Element list
+    | TreeItem of Title*Element list
+    | Editor of EditorElement
+    | TabItem of TabItemElement
+    | TextArea of TextAreaElement
+    | Tab of Element list
+    | Scroll of Element
+and EditorElement =
     { doc: TextDocument;
         selection: (int*int)list } 
 
-[<CustomEquality; CustomComparison>]
-type TextAreaElement =
+
+and [<CustomEquality; CustomComparison>]MenuItemElement =
+    {   title: string
+        gesture: String
+        elements:Element list
+        onClick: (unit -> unit) option } 
+    override x.Equals(yobj) =
+        match yobj with
+        | :? MenuItemElement as y -> x.title = y.title && x.gesture = y.gesture && x.elements = y.elements
+        | _ -> false
+ 
+    override x.GetHashCode() = [hash x.title;hash x.gesture;hash x.elements] |> List.reduce (^^^)
+    interface System.IComparable with
+        member x.CompareTo yobj =
+            match yobj with
+            | :? MenuItemElement as y -> compare x.title y.title
+            | _ -> invalidArg "yobj" "cannot compare values of different types"
+
+
+and [<CustomEquality; CustomComparison>] TextAreaElement =
     {   text: string;
         onReturn : (string -> unit) option
         onTextChanged : (string -> unit) option } 
@@ -54,8 +89,8 @@ type TextAreaElement =
             | :? TextAreaElement as y -> compare x.text y.text
             | _ -> invalidArg "yobj" "cannot compare values of different types"
 
-[<CustomEquality; CustomComparison>]
-type TabItemElement =
+
+and [<CustomEquality; CustomComparison>] TabItemElement =
     { 
         id:string
         title: string
@@ -89,23 +124,7 @@ and Command =
     | Search of string
     | SearchNext of string
 // TODO see before, elements should have their own commands
-and Element = 
-    | Docked of Element*Dock
-    | Column of Element*int
-    | Row of Element*int
-    | Dock of Element list
-    | Menu of Element list
-    | MenuItem of Title*Element list*Command list*String
-    | Grid of Column list*Row list*Element list
-    | Splitter of SplitterDirection
-    | Terminal
-    | Tree of Element list
-    | TreeItem of Title*Element list
-    | Editor of EditorElement
-    | TabItem of TabItemElement
-    | TextArea of TextAreaElement
-    | Tab of Element list
-    | Scroll of Element
+
 
 type Directory = 
     | None
@@ -176,7 +195,10 @@ let ui (state:EditorState) =
 
     let tree = Tree <| makeTree state.currentFolder
     Dock [
-        Docked(Menu [MenuItem ("File",[MenuItem ("Open file",[], [BrowseFile], "" );MenuItem ("Open folder",[], [BrowseFolder], "");MenuItem ("Save",[], [SaveFile], "Ctrl+S")], [], "")],Dock.Top)
+        Docked(Menu [MenuItem {title="File";gesture= "";onClick= Option.None;elements=[
+            MenuItem {title="Open file";elements=[];onClick=Some(openFile);gesture="" };
+            MenuItem {title="Open folder";elements=[];onClick=Some(openFolder);gesture=""};
+            MenuItem {title="Save";elements=[];onClick=Some(fun () -> messages.OnNext(SaveFile)); gesture="Ctrl+S"}]}],Dock.Top)
         Grid ([GridLength(2.,GridUnitType.Star);GridLength(1.);GridLength(8.,GridUnitType.Star)],[],[
                 Column(tree,0)
                 Column(Splitter Vertical,1)
@@ -343,14 +365,13 @@ let rec render ui : UIElement =
             let m = new Menu()
             for x in xs do m.Items.Add (render x) |> ignore
             m :> UIElement
-        | MenuItem (title,xs,actions,gestureText) -> 
+        | MenuItem {title=title;elements=xs;onClick=actions;gesture=gestureText} -> 
             let mi = Controls.MenuItem(Header=title) 
             mi.InputGestureText <- gestureText
             for x in xs do mi.Items.Add(render x) |> ignore
             match actions with 
-                | [BrowseFile] -> mi.Click |> Observable.subscribe(fun e -> openFile()) |> ignore
-                | [SaveFile] -> mi.Click |> Observable.subscribe(fun e -> messages.OnNext(SaveFile)) |> ignore
-                | other -> ()
+                | Some action -> mi.Click |> Observable.subscribe(fun e -> action()) |> ignore
+                | Option.None -> ()
             mi :> UIElement
         | Grid (cols,rows,xs) ->
             let g = new Grid()

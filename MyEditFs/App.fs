@@ -1,4 +1,4 @@
-﻿module main
+﻿module main 
 
 open System
 open FsXaml
@@ -26,6 +26,7 @@ open ICSharpCode.AvalonEdit.Search
 open System.Windows.Shapes
 
 
+
 //#region helpers
 type Column = GridLength
 type Row = GridLength
@@ -34,13 +35,13 @@ type SplitterDirection = Horizontal | Vertical
 
 type EditorElement =
     { doc: TextDocument;
-      selection: (int*int)list } 
+        selection: (int*int)list } 
 
 [<CustomEquality; CustomComparison>]
 type TextAreaElement =
-    { text: string;
-      onReturn : (string -> unit) option
-      onTextChanged : (string -> unit) option } 
+    {   text: string;
+        onReturn : (string -> unit) option
+        onTextChanged : (string -> unit) option } 
     override x.Equals(yobj) =
         match yobj with
         | :? TextAreaElement as y -> x.text = y.text
@@ -48,20 +49,20 @@ type TextAreaElement =
  
     override x.GetHashCode() = hash x.text
     interface System.IComparable with
-      member x.CompareTo yobj =
-          match yobj with
-          | :? TextAreaElement as y -> compare x.text y.text
-          | _ -> invalidArg "yobj" "cannot compare values of different types"
+        member x.CompareTo yobj =
+            match yobj with
+            | :? TextAreaElement as y -> compare x.text y.text
+            | _ -> invalidArg "yobj" "cannot compare values of different types"
 
 [<CustomEquality; CustomComparison>]
 type TabItemElement =
     { 
-      id:string
-      title: string
-      selected:bool
-      element: Element
-      onSelected : (unit -> unit) option
-      onClose : (unit -> unit) option } 
+        id:string
+        title: string
+        selected:bool
+        element: Element
+        onSelected : (unit -> unit) option
+        onClose : (unit -> unit) option } 
     override x.Equals(yobj) =
         match yobj with
         | :? TabItemElement as y -> x.selected = y.selected && x.title = y.title && x.element = y.element
@@ -69,10 +70,10 @@ type TabItemElement =
  
     override x.GetHashCode() = (hash x.selected) ^^^ (hash x.title) ^^^ (hash x.element)
     interface System.IComparable with
-      member x.CompareTo yobj =
-          match yobj with
-          | :? TabItemElement as y -> compare x.title y.title
-          | _ -> invalidArg "yobj" "cannot compare values of different types"
+        member x.CompareTo yobj =
+            match yobj with
+            | :? TabItemElement as y -> compare x.title y.title
+            | _ -> invalidArg "yobj" "cannot compare values of different types"
 
 // http://blogs.msdn.com/b/dsyme/archive/2009/11/08/equality-and-comparison-constraints-in-f-1-9-7.aspx
 // TODO separate pure UI command from application business commands
@@ -156,10 +157,10 @@ let ui (state:EditorState) =
             selected = state.current = docState.doc
             element=Dock
                 [
-                    Docked(TextArea {
-                                        text=docState.search
-                                        onTextChanged=Some(fun s -> messages.OnNext(Search s))
-                                        onReturn=Some(fun s -> messages.OnNext(SearchNext s)) },Dock.Top)
+//                    Docked(TextArea {
+//                                        text=docState.search
+//                                        onTextChanged=Some(fun s -> messages.OnNext(Search s))
+//                                        onReturn=Some(fun s -> messages.OnNext(SearchNext s)) },Dock.Top)
                     Editor {doc=docState.doc;selection=docState.selectedText}]
             onSelected = Some( fun () -> messages.OnNext(DocSelected docState.doc) )
             onClose = Some( fun () -> messages.OnNext(DocClosed docState.doc) )}
@@ -174,23 +175,20 @@ let ui (state:EditorState) =
             [TreeItem(p,  folderst @ filest )]
 
     let tree = Tree <| makeTree state.currentFolder
-    Dock [Docked(Menu [MenuItem ("File",
-                        [
-                        MenuItem ("Open file",[], [BrowseFile], "" )
-                        MenuItem ("Open folder",[], [BrowseFolder], "")
-                        MenuItem ("Save",[], [SaveFile], "Ctrl+S")], [], "")],Dock.Top)
-          Grid ([GridLength(1.,GridUnitType.Star);GridLength(5.);GridLength(2.,GridUnitType.Star)],[],[
-                    Column(tree,0)
-                    Column(Splitter Vertical,1)
-                    Column(
-                        Grid ([GridLength(1.,GridUnitType.Star)],
-                              [GridLength(2.,GridUnitType.Star);GridLength(5.);GridLength(1.,GridUnitType.Star)],
-                                [
-                                    Row(Tab tabs,0)
-                                    Row(Splitter Horizontal,1)
-                                    Row(Scroll(TextArea {text = state.consoleOutput;onTextChanged = Option.None;onReturn = Option.None}),2)
-                                ]),2)
-                ])
+    Dock [
+        Docked(Menu [MenuItem ("File",[MenuItem ("Open file",[], [BrowseFile], "" );MenuItem ("Open folder",[], [BrowseFolder], "");MenuItem ("Save",[], [SaveFile], "Ctrl+S")], [], "")],Dock.Top)
+        Grid ([GridLength(1.,GridUnitType.Star);GridLength(0.5);GridLength(9.,GridUnitType.Star)],[],[
+                Column(tree,0)
+                Column(Splitter Vertical,1)
+                Column(
+                    Grid ([GridLength(1.,GridUnitType.Star)],
+                            [GridLength(2.,GridUnitType.Star);GridLength(0.5);GridLength(1.,GridUnitType.Star)],
+                            [
+                                Row(Tab tabs,0)
+                                Row(Splitter Horizontal,1)
+                                Row(Scroll(TextArea {text = state.consoleOutput;onTextChanged = Option.None;onReturn = Option.None}),2)
+                            ]),2)
+            ])
     ]
 
 let color s = new SimpleHighlightingBrush(downcast ColorConverter.ConvertFromString(s))
@@ -313,7 +311,6 @@ let colors =
     "XmlTag", color "#F92672"] 
     |> Map.ofList
 
-type Cross = FsXaml.XAML<"cross.xaml", true>
 
 let rec render ui : UIElement = 
 
@@ -327,21 +324,17 @@ let rec render ui : UIElement =
             d :> UIElement
         | Terminal -> new Terminal() :> UIElement
         | Tab xs -> 
-            let d = new TabControl()            
+            let d = new TabControl()   
+            MahApps.Metro.Controls.TabControlHelper.SetIsUnderlined(d,true);
             for x in xs do d.Items.Add (render x) |> ignore
             d :> UIElement
         | TabItem {title=title;element=e;onSelected=com;onClose=close;selected=selected} ->
             let ti = new TabItem()
             ti.Content <- render e
-            let closeButton = new Cross()
-            closeButton.title.Text <- title
-            closeButton.title.MouseLeftButtonDown
-                |> Observable.subscribe(fun e ->
-                    match com with 
-                        | Some(tag) -> tag() |> ignore 
-                        | Option.None -> ()) |> ignore
+            let closeButton = new MyEdit.Wpf.Controls.TabItem()
+            closeButton.TabTitle.Text <- title
             match close with
-                | Some(close) -> closeButton.closeButton.Click |> Observable.subscribe(fun e -> close()) |> ignore
+                | Some(close) -> closeButton.TabClose.MouseDown |> Observable.subscribe(fun e -> close()) |> ignore
                 | Option.None -> ()
             ti.Header <- closeButton
             ti.IsSelected <- selected
@@ -404,7 +397,7 @@ let rec render ui : UIElement =
             editor.Foreground <- fgColor
             editor.Options.ConvertTabsToSpaces <- true
             editor.Options.EnableHyperlinks <- false
-            editor.Options.ShowColumnRuler <- true
+//            editor.Options.ShowColumnRuler <- true
             let sp = SearchPanel.Install(editor)
             let brush = colors.["FindHighlight"]
             sp.MarkerBrush  <- brush.GetBrush(null)
@@ -450,8 +443,8 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
             | (x::xs,y::ys,z::zs) when x = y -> z::resolve xs ys zs
             | ((TabItem {title=ta;element=ea;id=ida})::xs,(TabItem {title=tb;element=eb;selected=selb;id=idb})::ys,z::zs) when ida = idb -> 
                 let ti = z :?> TabItem
-                let header = ti.Header :?> Cross
-                header.title.Text <- tb
+                let header = ti.Header :?> MyEdit.Wpf.Controls.TabItem
+                header.TabTitle.Text <- tb
                 ti.IsSelected <- selb
                 ti.Content <- List.head <| resolve [ea] [eb] [ti.Content :?> UIElement]
 
@@ -540,7 +533,7 @@ let run (script:string) =
 //            powershell.AddCommand("out-default") |> ignore
 //            powershell.Commands.Commands.[0].MergeMyResults(PipelineResultTypes.Error, PipelineResultTypes.Output);
 //            powershell.Invoke()
-              let pi = ProcessStartInfo (
+                let pi = ProcessStartInfo (
                         FileName = "cmd",
                         Arguments = "/c cd C:\perso\like && elm-make.exe main.elm --yes",
                         UseShellExecute = false,
@@ -548,15 +541,15 @@ let run (script:string) =
                         RedirectStandardError = true,
                         CreateNoWindow = true )
                         
-              let proc = new System.Diagnostics.Process()
-              proc.StartInfo <- pi
+                let proc = new System.Diagnostics.Process()
+                proc.StartInfo <- pi
 
-              proc.Start() |> ignore
+                proc.Start() |> ignore
 
-              while not proc.StandardOutput.EndOfStream do
+                while not proc.StandardOutput.EndOfStream do
                 let line = proc.StandardOutput.ReadLine()
                 messages.OnNext <| CommandOutput line
-              while not proc.StandardError.EndOfStream do
+                while not proc.StandardError.EndOfStream do
                 let line = proc.StandardError.ReadLine()
                 messages.OnNext <| CommandOutput line
               
@@ -576,9 +569,7 @@ let rec oneBefore files doc =
         | x::xs -> oneBefore xs doc
         | [x] -> null
 
-[<STAThread>]
-[<EntryPoint>]
-let main argv =
+let renderApp (w:Window) =
     
     let addSyntax (f:string) name ext = 
         use reader = new XmlTextReader(f)
@@ -595,9 +586,6 @@ let main argv =
 //                c.Foreground <- new SimpleHighlightingBrush(Color.FromRgb (byte 248,byte 248,byte 242))
 
 
-    let w =  new Window(Title="F# is fun!",Width=260., Height=420.)
-    w.WindowState <- WindowState.Maximized
-    w.Show()
     w.Content <- List.head <| resolve [] [ui intialState] [] 
 
 
@@ -662,6 +650,3 @@ let main argv =
         .Subscribe(function (p,c) -> w.Content <- List.head <| resolve [p] [c] [downcast w.Content]  )
         |>ignore
 
-    let app = new Application()
-    app.Run(w)
-//    App().Root.Run()

@@ -6,7 +6,7 @@
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>eb103f18-9c5a-45ac-8563-3070b2ed0e80</ProjectGuid>
-    <OutputType>WinExe</OutputType>
+    <OutputType>Library</OutputType>
     <RootNamespace>MyEditFs</RootNamespace>
     <AssemblyName>MyEditFs</AssemblyName>
     <targetframeworkversion>v4.5</targetframeworkversion>
@@ -38,6 +38,14 @@
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
   </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <OutputPath>bin\Debug\</OutputPath>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <OutputPath>bin\Release\</OutputPath>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+  </PropertyGroup>
   <Choose>
     <When Condition="'$(VisualStudioVersion)' == '11.0'">
       <PropertyGroup Condition="Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets')">
@@ -65,7 +73,6 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <Content Include="WP-Fx_License.txt" />
-    <Resource Include="cross.xaml" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Accessibility" />
@@ -83,6 +90,10 @@
     </Reference>
     <Reference Include="ICSharpCode.AvalonEdit">
       <HintPath>..\..\MyEdit\packages\AvalonEdit.5.0.2\lib\Net40\ICSharpCode.AvalonEdit.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="MahApps.Metro">
+      <HintPath>..\packages\MahApps.Metro.1.0.0.0\lib\net45\MahApps.Metro.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />
@@ -136,7 +147,7 @@
     <Reference Include="System.Windows" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Windows.Interactivity">
-      <HintPath>..\..\MyEdit\packages\Expression.Blend.Sdk.1.0.2\lib\net45\System.Windows.Interactivity.dll</HintPath>
+      <HintPath>..\packages\MahApps.Metro.1.0.0.0\lib\net45\System.Windows.Interactivity.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System.Xaml" />
@@ -178,6 +189,11 @@
     <ProjectReference Include="..\..\MyEdit\MyEdit.Powershell\MyEdit.Powershell.csproj">
       <Name>MyEdit.Powershell</Name>
       <Project>{136ffca6-292a-4e53-ad84-17534ce067d6}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\MyEdit.Wpf.Controls\MyEdit.Wpf.Controls.csproj">
+      <Name>MyEdit.Wpf.Controls</Name>
+      <Project>{771cd621-b0d3-4852-a813-346082dcaf31}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>

@@ -22,6 +22,19 @@ Why am I writing my own code editor ?
 
 This is where we have a fun and see how the baby is growing :smiley:
 
+## Version 7
+
+- Skining (Thanks to awesome project [mahapps](http://mahapps.com)
+- Refactoring, extracted WPF setup code from F# to C#
+- Bug fixes
+- Tree diffing optimisations
+
+Don't like the look and feel of the grid splitter.
+Tree browser still not fixed :p
+
+
+![shot](/Versions/7.png) 
+
 ## Version 6
 
 - Ability to close tabs (Thanks to [fsxaml](https://github.com/fsprojects/FsXaml), it's a real pleasure to work with static xaml in fs)

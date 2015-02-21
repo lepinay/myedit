@@ -24,7 +24,7 @@ This is where we have a fun and see how the baby is growing :smiley:
 
 ## Version 7
 
-- Skining (Thanks to awesome project [mahapps](http://mahapps.com)
+- Skining (Thanks to awesome project [mahapps](http://mahapps.com) )
 - Refactoring, extracted WPF setup code from F# to C#
 - Bug fixes
 - Tree diffing optimisations

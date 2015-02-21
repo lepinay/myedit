@@ -177,12 +177,12 @@ let ui (state:EditorState) =
     let tree = Tree <| makeTree state.currentFolder
     Dock [
         Docked(Menu [MenuItem ("File",[MenuItem ("Open file",[], [BrowseFile], "" );MenuItem ("Open folder",[], [BrowseFolder], "");MenuItem ("Save",[], [SaveFile], "Ctrl+S")], [], "")],Dock.Top)
-        Grid ([GridLength(1.,GridUnitType.Star);GridLength(0.5);GridLength(9.,GridUnitType.Star)],[],[
+        Grid ([GridLength(2.,GridUnitType.Star);GridLength(1.);GridLength(8.,GridUnitType.Star)],[],[
                 Column(tree,0)
                 Column(Splitter Vertical,1)
                 Column(
                     Grid ([GridLength(1.,GridUnitType.Star)],
-                            [GridLength(2.,GridUnitType.Star);GridLength(0.5);GridLength(1.,GridUnitType.Star)],
+                            [GridLength(2.,GridUnitType.Star);GridLength(1.);GridLength(1.,GridUnitType.Star)],
                             [
                                 Row(Tab tabs,0)
                                 Row(Splitter Horizontal,1)
@@ -372,9 +372,11 @@ let rec render ui : UIElement =
             elt
         | Splitter Vertical ->
             let gs = new GridSplitter(VerticalAlignment=VerticalAlignment.Stretch,HorizontalAlignment=HorizontalAlignment.Center,ResizeDirection=GridResizeDirection.Columns,ShowsPreview=true,Width=5.)
+            gs.Background <- (color "#252525").GetBrush(null)
             gs :> UIElement
         | Splitter Horizontal ->
             let gs = new GridSplitter(VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Stretch,ResizeDirection=GridResizeDirection.Rows,ShowsPreview=true,Height=5.)
+            gs.Background <- (color "#252525").GetBrush(null)
             gs :> UIElement
         | Tree xs ->
             let t = new TreeView()

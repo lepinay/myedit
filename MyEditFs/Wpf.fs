@@ -186,6 +186,10 @@ let rec render ui : VirtualDom =
                 match close with
                     | Some(close) -> [closeButton.TabClose.MouseDown |> Observable.subscribe(fun e -> close())]
                     | Option.None -> []
+                @
+                match com with
+                    | Some(selected) -> [closeButton.MouseDown |> Observable.subscribe(fun e -> selected())]
+                    | Option.None -> []
             ti.Header <- closeButton
             ti.IsSelected <- selected
             Node {element=ui; ui=ti :> UIElement;subs=subs;childrens=[child]}
@@ -330,15 +334,16 @@ let rec resolve (prev:VirtualDom list) (curr:Element list) : VirtualDom list =
                 []
             | (Node {element=x} as z::xs,y::ys) when x = y -> 
                 z::resolve xs ys
-            | (Node {element=TabItem {title=ta;id=ida};ui=ui;childrens=ea} as z::xs,(TabItem {title=tb;element=eb;selected=selb;id=idb})::ys) when ida = idb -> 
+            | (Node {element=TabItem {title=ta;id=ida};ui=ui;childrens=ea} as z::xs,(TabItem {title=tb;element=eb;selected=selb;id=idb} as tib)::ys) when ida = idb -> 
                 let ti = ui :?> TabItem
                 let header = ti.Header :?> MyEdit.Wpf.Controls.TabItem
                 header.TabTitle.Text <- tb
                 ti.IsSelected <- selb
-                ti.Content <- uielt (List.head <| resolve ea [eb])
+                let childrens = resolve ea [eb]
+                ti.Content <- uielt (List.head <| childrens)
 
                 // This won't handle the case where tabs were reordered since ys wont' have chance to go again trought all xs !
-                z::resolve xs ys
+                Node{element=tib;ui=ui;subs=[];childrens=childrens}::resolve xs ys
             | (Node {element=TabItem {id=ida}}::xs,(TabItem {id=idb} as y)::ys) when ida <> idb -> resolve xs (y::ys)
             | (Node {element=Tab _;ui=z;childrens=a}::xs,(Tab b)::ys) -> 
                 let tab = z :?> TabControl     

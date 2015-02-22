@@ -22,6 +22,15 @@ Why am I writing my own code editor ?
 
 This is where we have a fun and see how the baby is growing :smiley:
 
+## Version 8
+
+- Refactored diffing algo to take into account events subscriptions
+- New algo is much more slower so will need too optimize
+- Tree File browser fixed but will need more visual design :p
+
+![shot](/Versions/8.png) 
+
+
 ## Version 7
 
 - Skining (Thanks to awesome project [mahapps](http://mahapps.com) )

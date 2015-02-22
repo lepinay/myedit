@@ -16,6 +16,10 @@ open System.Reactive.Linq
 open System.Threading.Tasks
 open System.Diagnostics
 
+type Directory = 
+    | None
+    | Directory of string*Directory list*string list
+
 type Command =
     | SaveFile
     | OpenFile of string
@@ -27,11 +31,8 @@ type Command =
     | Search of string
     | SearchNext of string
     | SelectFile of string
-    | ExpandFolder of string
+    | ExpandFolder of Directory
 
-type Directory = 
-    | None
-    | Directory of string*Directory list*string list
 
 type TabState = {
     path:string
@@ -93,10 +94,10 @@ let ui (state:EditorState) =
         |> List.map filesToTabs
     let rec makeTree = function
         | None -> []
-        | Directory (p, folders, files) -> 
+        | Directory (p, folders, files) as folder -> 
             let filest = List.map( fun f -> TreeItem{title=f;elements=[];onTreeItemSelected=Some(fun () -> messages.OnNext(SelectFile f))}) files
             let folderst = List.map makeTree folders |> List.concat
-            [TreeItem{title=p;elements=folderst @ filest;onTreeItemSelected = Some(fun () ->messages.OnNext( ExpandFolder p))}]
+            [TreeItem{title=p;elements=folderst @ filest;onTreeItemSelected = Some(fun () ->messages.OnNext( ExpandFolder folder))}]
 
     let tree = Tree <| makeTree state.currentFolder
     Dom.Dock [
@@ -126,7 +127,7 @@ let intialState = {
     watches=[("elm-make %currentpath% --yes")]
     consoleOutput=""
     current=null
-    currentFolder=Directory ("Code", [Directory ("Src", [], ["file1.test";"file2.test"]) ], ["file1";"file2"]) 
+    currentFolder=None 
     }
 
 
@@ -180,6 +181,23 @@ let rec oneBefore files doc =
         | x::xs -> oneBefore xs doc
         | [x] -> null
 
+
+let expandPath s =
+    let dirs = 
+        System.IO.Directory.EnumerateDirectories(s)
+        |> Seq.map(fun p -> Directory(p,[],[])  )
+        |> Seq.toList
+    Directory(s,dirs,System.IO.Directory.EnumerateFiles(s) |> Seq.toList) 
+
+let rec expandFolder (owner:Directory) (target:Directory) = 
+
+    match (owner,target) with
+        | (Directory (apath,adirs,afiles), Directory (bpath,bdirs,bfiles) ) when apath = bpath  -> 
+            expandPath apath
+        | (Directory (apath,adirs,afiles), Directory (bpath,bdirs,bfiles) ) when bpath.StartsWith(apath)  -> 
+            Directory(apath,adirs |> List.map (fun sdir -> expandFolder sdir target),afiles)
+        | other  -> owner
+
 let renderApp (w:Window) =
     
     let addSyntax (f:string) name ext = 
@@ -214,7 +232,7 @@ let renderApp (w:Window) =
                 | TextChanged doc ->
                     let starize (t:String) = if t.EndsWith("*") then t else t+"*"
                     {state with openFiles= List.map(fun tstate -> if tstate.doc = doc then {tstate with path = starize tstate.path} else tstate) state.openFiles }      
-                | OpenFile s ->
+                | OpenFile s | SelectFile s ->
                     let content = IO.File.ReadAllText(s)
                     let doc = new ICSharpCode.AvalonEdit.Document.TextDocument(content)
                     doc.FileName <- s
@@ -252,11 +270,9 @@ let renderApp (w:Window) =
                             else state
                         | other -> state
                 | OpenFolder s ->
-                    let dirs = 
-                        System.IO.Directory.EnumerateDirectories(s)
-                        |> Seq.map(fun p -> Directory(p,[],[])  )
-                        |> Seq.toList
-                    {state with currentFolder=Directory(s,dirs,System.IO.Directory.EnumerateFiles(s) |> Seq.toList) }
+                    {state with currentFolder=expandPath s }
+                | ExpandFolder d ->
+                    {state with currentFolder = expandFolder state.currentFolder d }
                 | other -> 
                     Console.WriteLine(sprintf "not handled %A" other)
                     state  )

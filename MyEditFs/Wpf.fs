@@ -138,7 +138,36 @@ let itemsToList (coll:ItemCollection) =
     seq { for c in coll -> c :?> UIElement } |> Seq.toList
 
 
-let rec render ui : UIElement = 
+type VirtualDomLeafElement = {
+    element : Element
+    ui : UIElement
+    subs : IDisposable list
+}
+
+type VirtualDomNodeElement = {
+    element : Element
+    ui : UIElement
+    subs : IDisposable list
+    childrens:VirtualDom list
+}
+
+and VirtualDom = 
+    | Node of VirtualDomNodeElement
+    | Leaf of VirtualDomLeafElement
+
+let appendChildrens add childrens =
+    for child in childrens do 
+        match child with
+            | Node{ui=ui} ->  add ui |> ignore
+            | Leaf{ui=ui} ->  add ui |> ignore
+
+let uielt dom = 
+    match dom with
+        | Node {ui=elt} -> elt
+        | Leaf {ui=elt} -> elt
+
+
+let rec render ui : VirtualDom = 
 
     let bgColor = new SolidColorBrush(Color.FromRgb (byte 39,byte 40,byte 34))
     let fgColor = new SolidColorBrush(Color.FromRgb (byte 248,byte 248,byte 242))
@@ -146,37 +175,42 @@ let rec render ui : UIElement =
     match ui with
         | Dock xs -> 
             let d = new DockPanel(LastChildFill=true)
-            for x in xs do d.Children.Add (render x) |> ignore
-            d :> UIElement
+            let childrens = xs |> List.map render
+            appendChildrens d.Children.Add childrens
+            Node {element=ui; ui=d :> UIElement;subs=[];childrens=childrens}
 //        | Terminal -> new Terminal() :> UIElement
         | Tab xs -> 
             let d = new TabControl()   
             MahApps.Metro.Controls.TabControlHelper.SetIsUnderlined(d,true);
-            for x in xs do d.Items.Add (render x) |> ignore
-            d :> UIElement
+            let childrens = xs |> List.map render
+            appendChildrens d.Items.Add childrens
+            Node {element=ui; ui=d :> UIElement;subs=[];childrens=childrens}
         | TabItem {title=title;element=e;onSelected=com;onClose=close;selected=selected} ->
             let ti = new TabItem()
             ti.Content <- render e
             let closeButton = new MyEdit.Wpf.Controls.TabItem()
             closeButton.TabTitle.Text <- title
-            match close with
-                | Some(close) -> closeButton.TabClose.MouseDown |> Observable.subscribe(fun e -> close()) |> ignore
-                | Option.None -> ()
+            let subs = 
+                match close with
+                    | Some(close) -> [closeButton.TabClose.MouseDown |> Observable.subscribe(fun e -> close())]
+                    | Option.None -> []
             ti.Header <- closeButton
             ti.IsSelected <- selected
-            ti :> UIElement
+            Leaf {element=ui; ui=ti :> UIElement;subs=subs}
         | Menu xs ->
             let m = new Menu()
-            for x in xs do m.Items.Add (render x) |> ignore
-            m :> UIElement
+            let childrens = xs |> List.map render
+            appendChildrens m.Items.Add childrens
+            Node {element=ui; ui=m :> UIElement;subs=[];childrens=childrens}
         | MenuItem {title=title;elements=xs;onClick=actions;gesture=gestureText} -> 
             let mi = Controls.MenuItem(Header=title) 
             mi.InputGestureText <- gestureText
             for x in xs do mi.Items.Add(render x) |> ignore
-            match actions with 
-                | Some action -> mi.Click |> Observable.subscribe(fun e -> action()) |> ignore
-                | Option.None -> ()
-            mi :> UIElement
+            let subs = 
+                match actions with 
+                    | Some action -> [mi.Click |> Observable.subscribe(fun e -> action())]
+                    | Option.None -> []
+            Leaf {element=ui; ui=mi :> UIElement;subs=subs}
         | Grid (cols,rows,xs) ->
             let g = new Grid()
             let sizeToLength = function
@@ -184,47 +218,55 @@ let rec render ui : UIElement =
                 | Pixels n -> GridLength(n)
             for row in rows do g.RowDefinitions.Add(new RowDefinition(Height=sizeToLength row))
             for col in cols do g.ColumnDefinitions.Add(new ColumnDefinition(Width=sizeToLength col))
-            for x in xs do g.Children.Add(render x) |> ignore
-            g :> UIElement
+            let childrens = xs |> List.map render
+            appendChildrens g.Children.Add childrens
+            Node {element=ui; ui=g :> UIElement;subs=[];childrens=childrens}
         | Docked (e,d) ->
-            let elt = render e
+            let dom = render e
+            let elt = uielt dom
             DockPanel.SetDock(elt,d)
-            elt
+            dom
         | Column (e,d) ->
-            let elt = render e
+            let dom = render e
+            let elt = uielt dom
             Grid.SetColumn(elt,d)
-            elt
+            dom
         | Row (e,d) ->
-            let elt = render e
+            let dom = render e
+            let elt = uielt dom
             Grid.SetRow(elt,d)
-            elt
+            dom
         | Splitter Vertical ->
             let gs = new GridSplitter(VerticalAlignment=VerticalAlignment.Stretch,HorizontalAlignment=HorizontalAlignment.Center,ResizeDirection=GridResizeDirection.Columns,ShowsPreview=true,Width=5.)
             gs.Background <- (color "#252525").GetBrush(null)
-            gs :> UIElement
+            Leaf {element=ui; ui=gs :> UIElement;subs=[]}
         | Splitter Horizontal ->
             let gs = new GridSplitter(VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Stretch,ResizeDirection=GridResizeDirection.Rows,ShowsPreview=true,Height=5.)
             gs.Background <- (color "#252525").GetBrush(null)
-            gs :> UIElement
+            Leaf {element=ui; ui=gs :> UIElement;subs=[]}
         | Tree xs ->
             let t = new TreeView()
-            for x in xs do t.Items.Add(render x) |> ignore
-            t :> UIElement
+            let childrens = xs |> List.map render
+            appendChildrens t.Items.Add childrens
+            Node {element=ui; ui=t :> UIElement;subs=[];childrens=childrens}
         | TreeItem {title=title;elements=xs;onTreeItemSelected=onTreeItemSelected} ->
             let ti = new TreeViewItem()
             ti.Header <- title
-            match onTreeItemSelected with
-                | Some(action) -> ti.Selected |> Observable.subscribe(fun e -> action()) |> ignore
-                | None -> ()
-            for x in xs do ti.Items.Add(render x) |> ignore
-            ti :> UIElement
+            let subs = 
+                match onTreeItemSelected with
+                    | Some(action) -> [ti.Selected |> Observable.subscribe(fun e -> action())]
+                    | None -> []
+            let childrens = xs |> List.map render
+            appendChildrens ti.Items.Add childrens
+            Node {element=ui; ui=ti :> UIElement;subs=subs;childrens=childrens}
+
         | Editor {doc=doc;selection=selection;textChanged=textChanged} ->
             let editor = new TextEditor();
 
             editor.SyntaxHighlighting <- HighlightingManager.Instance.GetDefinitionByExtension(IO.Path.GetExtension(doc.FileName));
             editor.Document <- doc;
             editor.FontFamily <- FontFamily("Consolas")
-            editor.TextChanged |> Observable.subscribe(fun e -> textChanged(doc)  ) |> ignore
+            let subs = [editor.TextChanged |> Observable.subscribe(fun e -> textChanged(doc)  )]
             editor.ShowLineNumbers <- true
             editor.Background <- bgColor
             editor.Foreground <- fgColor
@@ -241,30 +283,31 @@ let rec render ui : UIElement =
             foldingStrategy.UpdateFoldings(foldingManager, editor.Document);
 
             editor.Options.EnableRectangularSelection <- true
-
-            editor :> UIElement
+            Leaf {element=ui; ui=editor :> UIElement;subs=subs}
         | TextArea {text=s;onTextChanged=textChanged;onReturn=returnKey} -> 
             let tb = new TextBox(Background = bgColor, Foreground = fgColor)
             tb.Text <- s
             tb.FontFamily <- FontFamily("Consolas")
-            match textChanged with
-                | Some(action) ->  tb.TextChanged |> Observable.subscribe(fun e -> action tb.Text)  |> ignore
-                | Option.None -> ()
-            match returnKey with
-                | Some(action) ->  tb.KeyDown |> Observable.subscribe(fun e -> action tb.Text)  |> ignore
-                | Option.None -> ()
-            tb :> UIElement
+            let subs = 
+                match textChanged with
+                    | Some(action) ->  [tb.TextChanged |> Observable.subscribe(fun e -> action tb.Text)]
+                    | Option.None -> []
+                @
+                match returnKey with
+                    | Some(action) ->  [tb.KeyDown |> Observable.subscribe(fun e -> action tb.Text)]
+                    | Option.None -> []
+            Leaf {element=ui; ui=tb :> UIElement;subs=subs}
         | Scroll e ->
             let scroll = new ScrollViewer()
             scroll.Content <- render e
-            scroll :> UIElement
+            Leaf {element=ui; ui=scroll :> UIElement;subs=[]}
         | other -> failwith "not handled"
 
 
 // Goal of this method is to avoid to call render as much as possible and instead reuse as much as already existing WPF controls between 
 // virtual dom changes
 // Calling render is expensive as it will create new control and trigger reflows
-let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) : UIElement list = 
+let rec resolve (prev:VirtualDom list) (curr:Element list) : VirtualDom list = 
     if prev = curr then screen 
     else 
         match (prev,curr,screen) with

@@ -210,9 +210,12 @@ let rec render ui : UIElement =
             let t = new TreeView()
             for x in xs do t.Items.Add(render x) |> ignore
             t :> UIElement
-        | TreeItem (title,xs) ->
+        | TreeItem {title=title;elements=xs;onTreeItemSelected=onTreeItemSelected} ->
             let ti = new TreeViewItem()
             ti.Header <- title
+            match onTreeItemSelected with
+                | Some(action) -> ti.Selected |> Observable.subscribe(fun e -> action()) |> ignore
+                | None -> ()
             for x in xs do ti.Items.Add(render x) |> ignore
             ti :> UIElement
         | Editor {doc=doc;selection=selection;textChanged=textChanged} ->
@@ -313,8 +316,22 @@ let rec resolve (prev:Element list) (curr:Element list) (screen:UIElement list) 
                 let tb = z :?> TextBox
                 tb.AppendText("\n"+b)
                 z::resolve xs ys zs
+            | ((Tree a)::xs,(Tree b)::ys,z::zs) ->
+                let tree = z :?> TreeView     
+                let childrens = (itemsToList tree.Items)
+                tree.Items.Clear()
+                for c in resolve a b childrens do tree.Items.Add(c) |> ignore
+                (tree :> UIElement)::resolve xs ys zs
+            | ((TreeItem {elements=a})::xs,(TreeItem {title=tb;elements=b})::ys,z::zs) ->
+                let tree = z :?> TreeViewItem   
+                tree.Header <- tb
+                let childrens = (itemsToList tree.Items)
+                tree.Items.Clear()
+                for c in resolve a b childrens do tree.Items.Add(c) |> ignore
+                (tree :> UIElement)::resolve xs ys zs
+//            | TreeItem of string*Element list
             | ([],y::ys,[]) -> 
-//                debug <| sprintf "render %A" y 
+                System.Diagnostics.Debug.WriteLine <| sprintf "render %A" y 
                 (render y)::resolve [] ys []
             | ([],[],[]) -> []
 

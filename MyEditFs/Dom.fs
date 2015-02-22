@@ -3,6 +3,7 @@
 open System.Windows.Controls
 open ICSharpCode.AvalonEdit.Document
 open System.Windows
+open System
 
 type Title = String
 type SplitterDirection = Horizontal | Vertical
@@ -19,7 +20,7 @@ type Element =
     | Splitter of SplitterDirection
     | Terminal
     | Tree of Element list
-    | TreeItem of string*Element list
+    | TreeItem of TreeItemElement
     | Editor of EditorElement
     | TabItem of TabItemElement
     | TextArea of TextAreaElement
@@ -53,7 +54,7 @@ and [<CustomEquality; CustomComparison>]MenuItemElement =
         | :? MenuItemElement as y -> x.title = y.title && x.gesture = y.gesture && x.elements = y.elements
         | _ -> false
  
-    override x.GetHashCode() = [hash x.title;hash x.gesture;hash x.elements] |> List.reduce (^^^)
+    override x.GetHashCode() = (hash x.title) ^^^ (hash x.gesture) ^^^ (hash x.elements)
     interface System.IComparable with
         member x.CompareTo yobj =
             match yobj with
@@ -96,4 +97,19 @@ and [<CustomEquality; CustomComparison>] TabItemElement =
         member x.CompareTo yobj =
             match yobj with
             | :? TabItemElement as y -> compare x.title y.title
+            | _ -> invalidArg "yobj" "cannot compare values of different types"
+and [<CustomEquality; CustomComparison>] TreeItemElement =
+    {   title: string
+        elements: Element list
+        onTreeItemSelected : (unit -> unit) option } 
+    override x.Equals(yobj) =
+        match yobj with
+        | :? TreeItemElement as y -> x.title = y.title && x.elements = y.elements
+        | _ -> false
+ 
+    override x.GetHashCode() = (hash x.title) ^^^ (hash x.elements)
+    interface System.IComparable with
+        member x.CompareTo yobj =
+            match yobj with
+            | :? TreeItemElement as y -> compare x.title y.title
             | _ -> invalidArg "yobj" "cannot compare values of different types"

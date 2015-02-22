@@ -17,16 +17,17 @@ open System.Threading.Tasks
 open System.Diagnostics
 
 type Command =
-    | BrowseFile
-    | BrowseFolder
     | SaveFile
     | OpenFile of string
+    | OpenFolder of string
     | TextChanged of TextDocument
     | CommandOutput of string
     | DocSelected of TextDocument
     | DocClosed of TextDocument
     | Search of string
     | SearchNext of string
+    | SelectFile of string
+    | ExpandFolder of string
 
 type Directory = 
     | None
@@ -61,8 +62,10 @@ let openFile () =
     ()
 
 let openFolder () =     
-    debug "open a folder"
-    ()
+    let dialog = new System.Windows.Forms.FolderBrowserDialog();
+    match dialog.ShowDialog() with
+        | Forms.DialogResult.OK -> messages.OnNext(OpenFolder dialog.SelectedPath)
+        | other -> ()
 
 let saveFile () = 
     debug "save a file"
@@ -91,9 +94,9 @@ let ui (state:EditorState) =
     let rec makeTree = function
         | None -> []
         | Directory (p, folders, files) -> 
-            let filest = List.map( fun f -> TreeItem(f,[])) files
+            let filest = List.map( fun f -> TreeItem{title=f;elements=[];onTreeItemSelected=Some(fun () -> messages.OnNext(SelectFile f))}) files
             let folderst = List.map makeTree folders |> List.concat
-            [TreeItem(p,  folderst @ filest )]
+            [TreeItem{title=p;elements=folderst @ filest;onTreeItemSelected = Some(fun () ->messages.OnNext( ExpandFolder p))}]
 
     let tree = Tree <| makeTree state.currentFolder
     Dom.Dock [
@@ -247,8 +250,14 @@ let renderApp (w:Window) =
                                 {state with openFiles= List.map (fun tab -> if tab.doc = state.current then {tab with selectedText = [(res,s.Length)] } else tab ) state.openFiles }
                             else state
                         | other -> state
+                | OpenFolder s ->
+                    let dirs = 
+                        System.IO.Directory.EnumerateDirectories(s)
+                        |> Seq.map(fun p -> Directory(p,[],[])  )
+                        |> Seq.toList
+                    {state with currentFolder=Directory(s,dirs,System.IO.Directory.EnumerateFiles(s) |> Seq.toList) }
                 | other -> 
-                    debug <| sprintf "not handled %A" other
+                    Console.WriteLine(sprintf "not handled %A" other)
                     state  )
         .Scan((ui intialState,ui intialState), fun (prevdom,newdom) state -> (newdom,ui state) )
         .ObserveOnDispatcher()

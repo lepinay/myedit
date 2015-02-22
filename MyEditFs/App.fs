@@ -194,7 +194,8 @@ let renderApp (w:Window) =
         for c in def.NamedHighlightingColors do 
             c.Foreground <- colors.[c.Name]
 
-    w.Content <- List.head <| resolve [] [ui intialState] [] 
+    let initDom = resolve [] [ui intialState]
+    w.Content <- uielt (List.head <| initDom)
 
 
     let saveCommand = new KretschIT.WP_Fx.UI.Commands.RelayCommand(fun e -> messages.OnNext(SaveFile)  )
@@ -259,8 +260,8 @@ let renderApp (w:Window) =
                 | other -> 
                     Console.WriteLine(sprintf "not handled %A" other)
                     state  )
-        .Scan((ui intialState,ui intialState), fun (prevdom,newdom) state -> (newdom,ui state) )
         .ObserveOnDispatcher()
-        .Subscribe(function (p,c) -> w.Content <- List.head <| resolve [p] [c] [downcast w.Content]  )
+        .Scan(initDom, fun dom state -> resolve dom [ui state] )
+        .Subscribe(function dom -> w.Content <- uielt (List.head dom) )
         |>ignore
 

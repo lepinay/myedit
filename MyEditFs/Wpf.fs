@@ -138,12 +138,6 @@ let itemsToList (coll:ItemCollection) =
     seq { for c in coll -> c :?> UIElement } |> Seq.toList
 
 
-type VirtualDomLeafElement = {
-    element : Element
-    ui : UIElement
-    subs : IDisposable list
-}
-
 type VirtualDomNodeElement = {
     element : Element
     ui : UIElement
@@ -153,18 +147,15 @@ type VirtualDomNodeElement = {
 
 and VirtualDom = 
     | Node of VirtualDomNodeElement
-    | Leaf of VirtualDomLeafElement
 
 let appendChildrens add childrens =
     for child in childrens do 
         match child with
             | Node{ui=ui} ->  add ui |> ignore
-            | Leaf{ui=ui} ->  add ui |> ignore
 
 let uielt dom = 
     match dom with
         | Node {ui=elt} -> elt
-        | Leaf {ui=elt} -> elt
 
 
 let rec render ui : VirtualDom = 
@@ -187,7 +178,8 @@ let rec render ui : VirtualDom =
             Node {element=ui; ui=d :> UIElement;subs=[];childrens=childrens}
         | TabItem {title=title;element=e;onSelected=com;onClose=close;selected=selected} ->
             let ti = new TabItem()
-            ti.Content <- render e
+            let child = render e
+            ti.Content <- uielt child
             let closeButton = new MyEdit.Wpf.Controls.TabItem()
             closeButton.TabTitle.Text <- title
             let subs = 
@@ -196,7 +188,7 @@ let rec render ui : VirtualDom =
                     | Option.None -> []
             ti.Header <- closeButton
             ti.IsSelected <- selected
-            Leaf {element=ui; ui=ti :> UIElement;subs=subs}
+            Node {element=ui; ui=ti :> UIElement;subs=subs;childrens=[child]}
         | Menu xs ->
             let m = new Menu()
             let childrens = xs |> List.map render
@@ -205,12 +197,13 @@ let rec render ui : VirtualDom =
         | MenuItem {title=title;elements=xs;onClick=actions;gesture=gestureText} -> 
             let mi = Controls.MenuItem(Header=title) 
             mi.InputGestureText <- gestureText
-            for x in xs do mi.Items.Add(render x) |> ignore
+            let childrens = xs |> List.map render
+            appendChildrens mi.Items.Add childrens
             let subs = 
                 match actions with 
                     | Some action -> [mi.Click |> Observable.subscribe(fun e -> action())]
                     | Option.None -> []
-            Leaf {element=ui; ui=mi :> UIElement;subs=subs}
+            Node {element=ui; ui=mi :> UIElement;subs=subs;childrens=[]}
         | Grid (cols,rows,xs) ->
             let g = new Grid()
             let sizeToLength = function
@@ -225,25 +218,25 @@ let rec render ui : VirtualDom =
             let dom = render e
             let elt = uielt dom
             DockPanel.SetDock(elt,d)
-            dom
+            Node {element=ui;ui=elt;subs=[];childrens=[dom]}
         | Column (e,d) ->
             let dom = render e
             let elt = uielt dom
             Grid.SetColumn(elt,d)
-            dom
+            Node {element=ui;ui=elt;subs=[];childrens=[dom]}
         | Row (e,d) ->
             let dom = render e
             let elt = uielt dom
             Grid.SetRow(elt,d)
-            dom
+            Node {element=ui;ui=elt;subs=[];childrens=[dom]}
         | Splitter Vertical ->
             let gs = new GridSplitter(VerticalAlignment=VerticalAlignment.Stretch,HorizontalAlignment=HorizontalAlignment.Center,ResizeDirection=GridResizeDirection.Columns,ShowsPreview=true,Width=5.)
             gs.Background <- (color "#252525").GetBrush(null)
-            Leaf {element=ui; ui=gs :> UIElement;subs=[]}
+            Node {element=ui; ui=gs :> UIElement;subs=[];childrens=[]}
         | Splitter Horizontal ->
             let gs = new GridSplitter(VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Stretch,ResizeDirection=GridResizeDirection.Rows,ShowsPreview=true,Height=5.)
             gs.Background <- (color "#252525").GetBrush(null)
-            Leaf {element=ui; ui=gs :> UIElement;subs=[]}
+            Node {element=ui; ui=gs :> UIElement;subs=[];childrens=[]}
         | Tree xs ->
             let t = new TreeView()
             let childrens = xs |> List.map render
@@ -254,7 +247,7 @@ let rec render ui : VirtualDom =
             ti.Header <- title
             let subs = 
                 match onTreeItemSelected with
-                    | Some(action) -> [ti.Selected |> Observable.subscribe(fun e -> action())]
+                    | Some(action) -> [ti.Selected |> Observable.subscribe(fun e ->e.Handled <- true; action())]
                     | None -> []
             let childrens = xs |> List.map render
             appendChildrens ti.Items.Add childrens
@@ -283,7 +276,7 @@ let rec render ui : VirtualDom =
             foldingStrategy.UpdateFoldings(foldingManager, editor.Document);
 
             editor.Options.EnableRectangularSelection <- true
-            Leaf {element=ui; ui=editor :> UIElement;subs=subs}
+            Node {element=ui; ui=editor :> UIElement;subs=subs;childrens=[]}
         | TextArea {text=s;onTextChanged=textChanged;onReturn=returnKey} -> 
             let tb = new TextBox(Background = bgColor, Foreground = fgColor)
             tb.Text <- s
@@ -296,97 +289,120 @@ let rec render ui : VirtualDom =
                 match returnKey with
                     | Some(action) ->  [tb.KeyDown |> Observable.subscribe(fun e -> action tb.Text)]
                     | Option.None -> []
-            Leaf {element=ui; ui=tb :> UIElement;subs=subs}
+            Node {element=ui; ui=tb :> UIElement;subs=subs;childrens=[]}
         | Scroll e ->
             let scroll = new ScrollViewer()
-            scroll.Content <- render e
-            Leaf {element=ui; ui=scroll :> UIElement;subs=[]}
+            let child = render e
+            scroll.Content <- uielt child
+            Node {element=ui; ui=scroll :> UIElement;subs=[];childrens=[child]}
         | other -> failwith "not handled"
 
 
 // Goal of this method is to avoid to call render as much as possible and instead reuse as much as already existing WPF controls between 
 // virtual dom changes
 // Calling render is expensive as it will create new control and trigger reflows
+let domListToElemList doms =
+    doms
+    |> List.map (fun (Node{element=d}) -> d )
+
+let trace s y = 
+    Console.WriteLine( sprintf "%s %A" s y )
+
+let trace2 s y z = 
+    Console.WriteLine( sprintf "%s\n%A\ncompared to\n%A" s y z )
+
+let clearSubs (subs:IDisposable seq) = 
+    for sub in subs do sub.Dispose()
+
 let rec resolve (prev:VirtualDom list) (curr:Element list) : VirtualDom list = 
-    if prev = curr then screen 
+    if domListToElemList prev = curr then prev 
     else 
-        match (prev,curr,screen) with
-            | (x::xs,y::ys,z::zs) when x = y -> z::resolve xs ys zs
-            | ((TabItem {title=ta;element=ea;id=ida})::xs,(TabItem {title=tb;element=eb;selected=selb;id=idb})::ys,z::zs) when ida = idb -> 
-                let ti = z :?> TabItem
+        match (prev,curr) with
+            | ([],[]) -> []
+            | ([],y::ys) -> 
+//                Console.WriteLine (sprintf "render %A" y )
+                (render y)::resolve [] ys
+            // UI element removed
+            | (x::xs,[]) -> 
+                // for z in zs do ??? what should we do when ui element are removed from the UI, right now they should be GCed
+                // will need to check w dont have memory leaks, speialy with all the event subscribers that could be still attached
+                // scary place here
+                []
+            | (Node {element=x} as z::xs,y::ys) when x = y -> 
+                z::resolve xs ys
+            | (Node {element=TabItem {title=ta;id=ida};ui=ui;childrens=ea} as z::xs,(TabItem {title=tb;element=eb;selected=selb;id=idb})::ys) when ida = idb -> 
+                let ti = ui :?> TabItem
                 let header = ti.Header :?> MyEdit.Wpf.Controls.TabItem
                 header.TabTitle.Text <- tb
                 ti.IsSelected <- selb
-                ti.Content <- List.head <| resolve [ea] [eb] [ti.Content :?> UIElement]
+                ti.Content <- uielt (List.head <| resolve ea [eb])
 
                 // This won't handle the case where tabs were reordered since ys wont' have chance to go again trought all xs !
-                z::resolve xs ys zs
-            | ((TabItem {id=ida})::xs,(TabItem {id=idb} as y)::ys,z::zs) when ida <> idb -> resolve xs (y::ys) zs
-            | ((Tab a)::xs,(Tab b)::ys,z::zs) -> 
+                z::resolve xs ys
+            | (Node {element=TabItem {id=ida}}::xs,(TabItem {id=idb} as y)::ys) when ida <> idb -> resolve xs (y::ys)
+            | (Node {element=Tab _;ui=z;childrens=a}::xs,(Tab b)::ys) -> 
                 let tab = z :?> TabControl     
-                let childrens = (itemsToList tab.Items)
                 tab.Items.Clear()
-                for c in resolve a b childrens do 
+                let childrens = resolve a b
+                for Node{ui=c} in childrens do 
                     tab.Items.Add(c) |> ignore
-                (tab :> UIElement)::resolve xs ys zs
-            | ((Dock a)::xs,(Dock b)::ys,z::zs) -> 
+                Node{element=Tab b;ui=z;childrens=childrens;subs=[]}::resolve xs ys
+            | (Node{element=Dock _;ui=z;childrens=a}::xs,(Dock b as dockb)::ys) -> 
                 let dock = z :?> DockPanel     
-                let childrens = (collToList dock.Children)
+                let childrens = resolve a b 
                 dock.Children.Clear()
-                for c in resolve a b childrens do dock.Children.Add(c) |> ignore
-                (dock :> UIElement)::resolve xs ys zs
-            | ((Column (a,pa))::xs,(Column (b,pb))::ys,z::zs) when pa = pb -> resolve [a] [b] [z] @ resolve xs ys zs
-            | ((Row (a,pa))::xs,(Row (b,pb))::ys,z::zs) when pa = pb -> resolve [a] [b] [z] @ resolve xs ys zs
-            | ((Grid (acols,arows,a))::xs,(Grid (bcols,brows,b))::ys,z::zs) when acols = bcols && arows = brows -> 
+                for Node{ui=c} in childrens do dock.Children.Add(c) |> ignore
+                Node{element=dockb;ui=z;childrens=childrens;subs=[]}::resolve xs ys
+            | (Node{element=Docked (da,pa);childrens=a;ui=z}::xs,(Docked (db,pb))::ys) when pa = pb -> Node{element=Docked(db,pb);ui=z;subs=[];childrens=resolve a [db]} :: resolve xs ys
+            | (Node{element=Column (_,pa);childrens=a;ui=z}::xs,(Column (b,pb))::ys) when pa = pb -> Node{element=Column(b,pb);ui=z;subs=[];childrens=resolve a [b]} :: resolve xs ys
+            | (Node{element=Row (_,pa);childrens=a;ui=z}::xs,(Row (b,pb))::ys) when pa = pb -> Node{element=Row(b,pb);ui=z;subs=[];childrens=resolve a [b]} :: resolve xs ys
+            | (Node{element=Grid (acols,arows,_);ui=z;childrens=a}::xs,(Grid (bcols,brows,b) as gridb)::ys) when acols = bcols && arows = brows -> 
                 let grid = z :?> Grid     
                 let childrens = (collToList grid.Children)
                 grid.Children.Clear()
-                for c in resolve a b childrens do grid.Children.Add(c) |> ignore
-                (grid :> UIElement)::resolve xs ys zs
-            | ((Editor {doc=tda;selection=sela})::xs,(Editor {doc=tdb;selection=selb})::ys,z::zs)  -> 
+                let childrens = resolve a b 
+                for Node{ui=c} in childrens do grid.Children.Add(c) |> ignore
+                Node{element=gridb;ui=z;childrens=childrens;subs=[]}::resolve xs ys
+            | (Node{element=Editor {doc=tda;selection=sela};ui=z}::xs,(Editor {doc=tdb;selection=selb} as editorb)::ys)  -> 
                 let editor = z :?> TextEditor
                 match selb with
                     | [(s,e)] -> editor.Select(s,e)
                     | [] -> editor.SelectionLength <- 0
                     | multiselect -> ()
-                z::resolve xs ys zs
-            | ((Scroll a)::xs,(Scroll b)::ys,z::zs) -> 
+                Node{element=editorb;ui=z;childrens=[];subs=[]}::resolve xs ys
+            | (Node {element=Scroll _;ui=z;childrens=a}::xs,(Scroll b)::ys) -> 
                 let scroll = z :?> ScrollViewer
-                scroll.Content <- List.head <| resolve [a] [b] [scroll.Content :?> UIElement]
+                let child = resolve a [b]
+                scroll.Content <- uielt <| List.head child
                 scroll.ScrollToBottom()
-                (scroll:>UIElement)::resolve xs ys zs
-            | ((TextArea {text=a})::xs,(TextArea {text=b})::ys,z::zs)  -> 
+                Node{element=Scroll b;ui=z;childrens=child;subs=[]}::resolve xs ys
+            | (Node{element=TextArea {text=a};ui=z}::xs,(TextArea {text=b} as textb)::ys)  -> 
                 let tb = z :?> TextBox
                 tb.AppendText("\n"+b)
-                z::resolve xs ys zs
-            | ((Tree a)::xs,(Tree b)::ys,z::zs) ->
+                Node{element=textb;ui=z;childrens=[];subs=[]}::resolve xs ys
+            | (Node{element=Tree _;ui=z;childrens=a}::xs,(Tree b as treeb)::ys) ->
                 let tree = z :?> TreeView     
                 let childrens = (itemsToList tree.Items)
                 tree.Items.Clear()
-                for c in resolve a b childrens do tree.Items.Add(c) |> ignore
-                (tree :> UIElement)::resolve xs ys zs
-            | ((TreeItem {elements=a})::xs,(TreeItem {title=tb;elements=b})::ys,z::zs) ->
+                let childrens = resolve a b
+                for c in  childrens do tree.Items.Add(uielt c) |> ignore
+                Node{element=treeb;ui=z;childrens=childrens;subs=[]}::resolve xs ys
+            | (Node{element=TreeItem {elements=_};ui=z;childrens=a;subs=subs}::xs,(TreeItem {title=tb;elements=b;onTreeItemSelected=action} as tib)::ys) ->
+                clearSubs subs
                 let tree = z :?> TreeViewItem   
                 tree.Header <- tb
+                let newsubs = 
+                    match action with 
+                        | Some(act) -> [tree.Selected |> Observable.subscribe(fun e ->e.Handled <- true; act() )] 
+                        | None -> []
                 let childrens = (itemsToList tree.Items)
                 tree.Items.Clear()
-                for c in resolve a b childrens do tree.Items.Add(c) |> ignore
-                (tree :> UIElement)::resolve xs ys zs
-//            | TreeItem of string*Element list
-            | ([],y::ys,[]) -> 
-                System.Diagnostics.Debug.WriteLine <| sprintf "render %A" y 
-                (render y)::resolve [] ys []
-            | ([],[],[]) -> []
-
-            // UI element removed
-            | (x::xs,[],zs) -> 
-                // for z in zs do ??? what should we do when ui element are removed from the UI, right now they should be GCed
-                // will need to check w dont have memory leaks, speialy with all the event subscribers that could be still attached
-                // scary place here
-                []
+                let childrens = resolve a b
+                for c in  childrens do tree.Items.Add(uielt c) |> ignore
+                Node{element=tib;ui=z;subs=newsubs;childrens=childrens}::resolve xs ys
             
-            | (_,y::ys,_) -> 
+            | (_,y::ys) -> 
                 failwith <| sprintf "unable to reuse from %A" y
-                (render y)::resolve [] ys []
-            | other -> failwith <| sprintf "not handled:\nPREV\n%A\nCURR\n%A\nSCREEN\n%A" prev curr screen
+                (render y)::resolve [] ys
+            | other -> failwith <| sprintf "not handled:\nPREV\n%A\nCURR\n%A" prev curr
 

@@ -101,11 +101,13 @@ let ui (state:EditorState) =
 
     let tree = Tree <| makeTree state.currentFolder
     Dom.Dock [
-        Docked(Dom.Menu [Dom.MenuItem {title="File";gesture= "";onClick= Option.None;elements=[
-                Dom.MenuItem {title="Open file";elements=[];onClick=Some(openFile);gesture="" };
-                Dom.MenuItem {title="Open folder";elements=[];onClick=Some(openFolder);gesture=""};
-                Dom.MenuItem {title="Save";elements=[];onClick=Some(fun () -> messages.OnNext(SaveFile)); gesture="Ctrl+S"}]}],Dock.Top)
-        Dom.Grid ([Star 2.;Pixels 1.;Star 8.],[],[
+        Docked(Dom.Menu [Dom.MenuItem {title="File";gesture= "";onClick= Option.None;
+                elements=[
+                            Dom.MenuItem {title="Open file";elements=[];onClick=Some(openFile);gesture="" };
+                            Dom.MenuItem {title="Open folder";elements=[];onClick=Some(openFolder);gesture=""};
+                            Dom.MenuItem {title="Save";elements=[];onClick=Some(fun () -> messages.OnNext(SaveFile)); gesture="Ctrl+S"}]}],Dock.Top)
+        Dom.Grid ([Star 2.;Pixels 1.;Star 8.],[],
+            [
                 Dom.Column(tree,0)
                 Dom.Column(Splitter Vertical,1)
                 Dom.Column(
@@ -149,7 +151,9 @@ let run (script:string) =
 //            powershell.AddCommand("out-default") |> ignore
 //            powershell.Commands.Commands.[0].MergeMyResults(PipelineResultTypes.Error, PipelineResultTypes.Output);
 //            powershell.Invoke()
-                let pi = ProcessStartInfo (
+                let pi = 
+                    ProcessStartInfo 
+                        (
                         FileName = "cmd",
                         Arguments = "/c cd C:\perso\like && elm-make.exe main.elm --yes",
                         UseShellExecute = false,
@@ -272,10 +276,7 @@ let renderApp (w:Window) =
                 | OpenFolder s ->
                     {state with currentFolder=expandPath s }
                 | ExpandFolder d ->
-                    {state with currentFolder = expandFolder state.currentFolder d }
-                | other -> 
-                    Console.WriteLine(sprintf "not handled %A" other)
-                    state  )
+                    {state with currentFolder = expandFolder state.currentFolder d })
         .ObserveOnDispatcher()
         .Scan(initDom, fun dom state -> resolve dom [ui state] )
         .Subscribe(function dom -> w.Content <- uielt (List.head dom) )

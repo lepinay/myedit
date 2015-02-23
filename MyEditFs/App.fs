@@ -114,7 +114,7 @@ let ui (state:EditorState) =
                 Dom.Column(Splitter Vertical,1)
                 Dom.Column(
                     Dom.Grid ([Star 1.],
-                            [Star 9.;Pixels 1.;Star 1.],
+                            [Star 8.;Pixels 1.;Star 2.],
                             [
                                 Row(Tab tabs,0)
                                 Row(Splitter Horizontal,1)
@@ -238,7 +238,7 @@ let renderApp (w:Window) =
             fun state cmd ->
                 match cmd with 
                 | TextChanged doc ->
-                    let starize (t:String) = if t.EndsWith("*") then t else t+"*"
+                    let starize (t:String) = if t.EndsWith(" \u2607") then t else t+" \u2607"
                     {state with openFiles= List.map(fun tstate -> if tstate.doc = doc then {tstate with path = starize tstate.path} else tstate) state.openFiles }      
                 | OpenFile s | SelectFile s ->
                     let content = IO.File.ReadAllText(s)
@@ -246,7 +246,7 @@ let renderApp (w:Window) =
                     doc.FileName <- s
                     {state with current=doc; openFiles=state.openFiles@[{path=s;doc=doc;search="";selectedText=[]}] } 
                 | SaveFile -> 
-                    let unstarize (s:String) = s.Replace("*","")
+                    let unstarize (s:String) = s.Replace(" \u2607","")
                     let tstate = List.find (fun tsate -> tsate.doc = state.current) state.openFiles
                     IO.File.WriteAllText(tstate.doc.FileName,tstate.doc.Text)
 

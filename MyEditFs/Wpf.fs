@@ -347,16 +347,21 @@ let rec resolve (prev:VirtualDom list) (curr:Element list) : VirtualDom list =
             | (Node {element=TabItem {id=ida}}::xs,(TabItem {id=idb} as y)::ys) when ida <> idb -> resolve xs (y::ys)
             | (Node {element=Tab _;ui=z;childrens=a}::xs,(Tab b)::ys) -> 
                 let tab = z :?> TabControl     
-                tab.Items.Clear()
                 let childrens = resolve a b
-                for Node{ui=c} in childrens do 
-                    tab.Items.Add(c) |> ignore
+                let childrensui = childrens |> List.map (fun (Node{ui=c}) -> c )
+                
+                for c in childrensui do 
+                    if(not (tab.Items.Contains(c))) then tab.Items.Add(c) |> ignore
+                
+                let removals =  List.fold (fun state elt -> if childrensui |> List.exists (fun c -> c = elt) then state else elt::state ) [] (itemsToList tab.Items)
+                for r in removals do tab.Items.Remove(r)    
+                                
                 Node{element=Tab b;ui=z;childrens=childrens;subs=[]}::resolve xs ys
             | (Node{element=Dock _;ui=z;childrens=a}::xs,(Dock b as dockb)::ys) -> 
                 let dock = z :?> DockPanel     
                 let childrens = resolve a b 
-                dock.Children.Clear()
-                for Node{ui=c} in childrens do dock.Children.Add(c) |> ignore
+                for Node{ui=c} in childrens do 
+                    if(not (dock.Children.Contains(c))) then dock.Children.Add(c) |> ignore
                 Node{element=dockb;ui=z;childrens=childrens;subs=[]}::resolve xs ys
             | (Node{element=Docked (da,pa);childrens=a;ui=z}::xs,(Docked (db,pb))::ys) when pa = pb -> Node{element=Docked(db,pb);ui=z;subs=[];childrens=resolve a [db]} :: resolve xs ys
             | (Node{element=Column (_,pa);childrens=a;ui=z}::xs,(Column (b,pb))::ys) when pa = pb -> Node{element=Column(b,pb);ui=z;subs=[];childrens=resolve a [b]} :: resolve xs ys
@@ -364,9 +369,9 @@ let rec resolve (prev:VirtualDom list) (curr:Element list) : VirtualDom list =
             | (Node{element=Grid (acols,arows,_);ui=z;childrens=a}::xs,(Grid (bcols,brows,b) as gridb)::ys) when acols = bcols && arows = brows -> 
                 let grid = z :?> Grid     
                 let childrens = (collToList grid.Children)
-                grid.Children.Clear()
                 let childrens = resolve a b 
-                for Node{ui=c} in childrens do grid.Children.Add(c) |> ignore
+                for Node{ui=c} in childrens do 
+                    if(not (grid.Children.Contains(c))) then grid.Children.Add(c) |> ignore
                 Node{element=gridb;ui=z;childrens=childrens;subs=[]}::resolve xs ys
             | (Node{element=Editor {doc=tda;selection=sela};ui=z}::xs,(Editor {doc=tdb;selection=selb} as editorb)::ys)  -> 
                 let editor = z :?> TextEditor

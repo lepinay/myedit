@@ -285,7 +285,7 @@ let rec render ui : VirtualDom =
             Node {element=ui; ui=editor :> UIElement;subs=subs;childrens=[]}
         | TextArea {text=s;onTextChanged=textChanged;onReturn=returnKey} -> 
             let tb = new TextBox(Background = bgColor, Foreground = fgColor)
-            tb.Text <- s
+            tb.AppendText s
             tb.FontFamily <- FontFamily("Consolas")
             let subs = 
                 match textChanged with

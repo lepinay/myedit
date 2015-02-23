@@ -47,7 +47,7 @@ type EditorState = {
     openFiles:TabState list
     current:TextDocument
     watches : (string) list
-    consoleOutput : StringBuilder
+    consoleOutput : string
     currentFolder: Directory
 }
 
@@ -118,7 +118,7 @@ let ui (state:EditorState) =
                             [
                                 Row(Tab tabs,0)
                                 Row(Splitter Horizontal,1)
-                                Row(Scroll(TextArea {text = state.consoleOutput.ToString();onTextChanged = Option.None;onReturn = Option.None}),2)
+                                Row(Scroll(TextArea {text = state.consoleOutput;onTextChanged = Option.None;onReturn = Option.None}),2)
                             ]),2)
             ])
     ]
@@ -129,7 +129,7 @@ let ui (state:EditorState) =
 let intialState = {
     openFiles=[]
     watches=[("elm-make %currentpath% --yes")]
-    consoleOutput=StringBuilder()
+    consoleOutput=""
     current=null
     currentFolder=None 
     }
@@ -171,14 +171,11 @@ let run (script:string) =
                 proc.BeginOutputReadLine()
                 let sb = StringBuilder()
 
-                use s1 = proc.OutputDataReceived |> Observable.subscribe(fun e -> sb.Append (e.Data + Environment.NewLine) |> ignore)
-                use s2 = proc.ErrorDataReceived |> Observable.subscribe(fun e -> sb.Append (e.Data + Environment.NewLine) |> ignore)
+                use s1 = proc.OutputDataReceived |> Observable.subscribe(fun e -> messages.OnNext <| CommandOutput e.Data |> ignore)
+                use s2 = proc.ErrorDataReceived |> Observable.subscribe(fun e -> messages.OnNext <| CommandOutput e.Data |> ignore)
                 
                 proc.WaitForExit()
                 proc.Close()
-
-                messages.OnNext <| CommandOutput (sb.ToString())
-              
             )
 
 //type App = XAML<"App.xaml">
@@ -259,8 +256,7 @@ let renderApp (w:Window) =
                     {state with openFiles= List.map(fun tstate' -> if tstate.doc = tstate'.doc then {tstate' with path = unstarize tstate'.path} else tstate') state.openFiles }      
                 | CommandOutput s ->
                     Console.WriteLine("received {0}", s)
-                    state.consoleOutput.Append(s) |> ignore
-                    state
+                    {state with consoleOutput = s }
                 | DocSelected s ->
                     {state with current = s}
                 | DocClosed s ->

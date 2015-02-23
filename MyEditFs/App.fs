@@ -16,6 +16,7 @@ open System.Reactive.Linq
 open System.Threading.Tasks
 open System.Diagnostics
 open System.IO
+open System.Text
 
 type Directory = 
     | None
@@ -46,7 +47,7 @@ type EditorState = {
     openFiles:TabState list
     current:TextDocument
     watches : (string) list
-    consoleOutput : string
+    consoleOutput : StringBuilder
     currentFolder: Directory
 }
 
@@ -113,11 +114,11 @@ let ui (state:EditorState) =
                 Dom.Column(Splitter Vertical,1)
                 Dom.Column(
                     Dom.Grid ([Star 1.],
-                            [Star 2.;Pixels 1.;Star 1.],
+                            [Star 9.;Pixels 1.;Star 1.],
                             [
                                 Row(Tab tabs,0)
                                 Row(Splitter Horizontal,1)
-                                Row(Scroll(TextArea {text = state.consoleOutput;onTextChanged = Option.None;onReturn = Option.None}),2)
+                                Row(Scroll(TextArea {text = state.consoleOutput.ToString();onTextChanged = Option.None;onReturn = Option.None}),2)
                             ]),2)
             ])
     ]
@@ -128,7 +129,7 @@ let ui (state:EditorState) =
 let intialState = {
     openFiles=[]
     watches=[("elm-make %currentpath% --yes")]
-    consoleOutput=""
+    consoleOutput=StringBuilder()
     current=null
     currentFolder=None 
     }
@@ -166,13 +167,17 @@ let run (script:string) =
                 proc.StartInfo <- pi
 
                 proc.Start() |> ignore
+                proc.BeginErrorReadLine()
+                proc.BeginOutputReadLine()
+                let sb = StringBuilder()
 
-                while not proc.StandardOutput.EndOfStream do
-                let line = proc.StandardOutput.ReadLine()
-                messages.OnNext <| CommandOutput line
-                while not proc.StandardError.EndOfStream do
-                let line = proc.StandardError.ReadLine()
-                messages.OnNext <| CommandOutput line
+                use s1 = proc.OutputDataReceived |> Observable.subscribe(fun e -> sb.Append (e.Data + Environment.NewLine) |> ignore)
+                use s2 = proc.ErrorDataReceived |> Observable.subscribe(fun e -> sb.Append (e.Data + Environment.NewLine) |> ignore)
+                
+                proc.WaitForExit()
+                proc.Close()
+
+                messages.OnNext <| CommandOutput (sb.ToString())
               
             )
 
@@ -253,7 +258,9 @@ let renderApp (w:Window) =
 
                     {state with openFiles= List.map(fun tstate' -> if tstate.doc = tstate'.doc then {tstate' with path = unstarize tstate'.path} else tstate') state.openFiles }      
                 | CommandOutput s ->
-                    {state with consoleOutput = s}
+                    Console.WriteLine("received {0}", s)
+                    state.consoleOutput.Append(s) |> ignore
+                    state
                 | DocSelected s ->
                     {state with current = s}
                 | DocClosed s ->

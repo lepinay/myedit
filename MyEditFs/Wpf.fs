@@ -266,6 +266,8 @@ let rec render ui : VirtualDom =
             let subs = [editor.TextChanged |> Observable.subscribe(fun e -> textChanged(doc)  )]
             editor.ShowLineNumbers <- true
             editor.Background <- bgColor
+            editor.Options.ShowTabs <- true
+            editor.Options.IndentationSize <- 2
             editor.Foreground <- fgColor
             editor.Options.ConvertTabsToSpaces <- true
             editor.Options.EnableHyperlinks <- false

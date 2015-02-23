@@ -22,6 +22,13 @@ Why am I writing my own code editor ?
 
 This is where we have a fun and see how the baby is growing :smiley:
 
+## Version 10
+
+- More optimz, I've switched the console from a textbox to an avalon edit control. This will enable better throughtput and syntax highlighting !
+
+![shot](/Versions/10.png) 
+
+
 ## Version 9
 
 - Optimized the diffing algo, things are now fast again but still some locking there and there that will need some investigation

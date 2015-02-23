@@ -1,0 +1,9 @@
+﻿<SyntaxDefinition name="Elm" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008" extensions = ".elm" >
+  <Color name="Error" foreground="Red" exampleText="error" />
+
+  <RuleSet>
+    <Span fontWeight="bold" color="Error" begin="error" />
+    <Span fontWeight="bold" color="Error" begin="Error" />
+    <Span fontWeight="bold" color="Error" begin="Type mismatch" />
+  </RuleSet>
+</SyntaxDefinition>

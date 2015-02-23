@@ -118,7 +118,7 @@ let ui (state:EditorState) =
                             [
                                 Row(Tab tabs,0)
                                 Row(Splitter Horizontal,1)
-                                Row(Scroll(TextArea {text = state.consoleOutput;onTextChanged = Option.None;onReturn = Option.None}),2)
+                                Row(TextArea {text = state.consoleOutput;onTextChanged = Option.None;onReturn = Option.None},2)
                             ]),2)
             ])
     ]
@@ -214,6 +214,7 @@ let renderApp (w:Window) =
 
     addSyntax @"Elm-Mode.xshd" "Elm"  [".elm"]
     addSyntax @"Html-Mode.xshd" "Html"  [".html";"*.htm"]
+    addSyntax @"Console-Mode.xshd" "Html"  [".console"]
 
     for def in HighlightingManager.Instance.HighlightingDefinitions do
         for c in def.NamedHighlightingColors do 

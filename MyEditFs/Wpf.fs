@@ -8,6 +8,7 @@ open ICSharpCode.AvalonEdit
 open ICSharpCode.AvalonEdit.Search
 open ICSharpCode.AvalonEdit.Folding
 open System
+open System.Windows.Documents
 
 let color s = new SimpleHighlightingBrush(downcast ColorConverter.ConvertFromString(s))
 let defaultColor = color "#FF0000"
@@ -50,6 +51,7 @@ let colors =
     "Entities", defaultColor;
     "Entity", color "#F92672";
     "EntityReference", defaultColor;
+    "Error", color "#FF0000";
     "ExceptionHandling", defaultColor;
     "ExceptionHandlingStatements", defaultColor;
     "ExceptionKeywords", defaultColor;
@@ -284,18 +286,21 @@ let rec render ui : VirtualDom =
             editor.Options.EnableRectangularSelection <- true
             Node {element=ui; ui=editor :> UIElement;subs=subs;childrens=[]}
         | TextArea {text=s;onTextChanged=textChanged;onReturn=returnKey} -> 
-            let tb = new TextBox(Background = bgColor, Foreground = fgColor)
-            tb.AppendText s
-            tb.FontFamily <- FontFamily("Consolas")
+            let editor = new TextEditor();
+
+            editor.FontFamily <- FontFamily("Consolas")
+            editor.Background <- bgColor
+            editor.Foreground <- fgColor
+            editor.SyntaxHighlighting <- HighlightingManager.Instance.GetDefinitionByExtension(".console");
+            editor.Options.EnableRectangularSelection <- true
+
+            editor.AppendText s
+            
             let subs = 
                 match textChanged with
-                    | Some(action) ->  [tb.TextChanged |> Observable.subscribe(fun e -> action tb.Text)]
+                    | Some(action) -> [editor.TextChanged |> Observable.subscribe(fun e -> action(editor.Text)  )]
                     | Option.None -> []
-                @
-                match returnKey with
-                    | Some(action) ->  [tb.KeyDown |> Observable.subscribe(fun e -> action tb.Text)]
-                    | Option.None -> []
-            Node {element=ui; ui=tb :> UIElement;subs=subs;childrens=[]}
+            Node {element=ui; ui=editor :> UIElement;subs=subs;childrens=[]}
         | Scroll e ->
             let scroll = new ScrollViewer()
             let child = render e
@@ -389,8 +394,9 @@ let rec resolve (prev:VirtualDom list) (curr:Element list) : VirtualDom list =
                 scroll.ScrollToBottom()
                 Node{element=Scroll b;ui=z;childrens=child;subs=[]}::resolve xs ys
             | (Node{element=TextArea {text=a};ui=z}::xs,(TextArea {text=b} as textb)::ys)  -> 
-                let tb = z :?> TextBox
+                let tb = z :?> TextEditor
                 tb.AppendText("\n"+b)
+                tb.ScrollToEnd()
                 Node{element=textb;ui=z;childrens=[];subs=[]}::resolve xs ys
             | (Node{element=Tree _;ui=z;childrens=a}::xs,(Tree b as treeb)::ys) ->
                 let tree = z :?> TreeView     

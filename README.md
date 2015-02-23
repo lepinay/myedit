@@ -22,12 +22,12 @@ Why am I writing my own code editor ?
 
 This is where we have a fun and see how the baby is growing :smiley:
 
-## Version 8
+## Version 9
 
 - Optimized the diffing algo, things are now fast again but still some locking there and there that will need some investigation
 - Added some icons for folders
 
-![shot](/Versions/8.png) 
+![shot](/Versions/9.png) 
 
 ## Version 8
 

@@ -183,7 +183,7 @@
     </ProjectReference>
     <ProjectReference Include="..\MyEdit.Wpf.Controls\MyEdit.Wpf.Controls.csproj">
       <Name>MyEdit.Wpf.Controls</Name>
-      <Project>{771cd621-b0d3-4852-a813-346082dcaf31}</Project>
+      <Project>{f581c3d8-9ccd-4b2d-90f3-60521ac42d25}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>

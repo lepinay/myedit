@@ -15,6 +15,7 @@ open System.Windows.Controls
 open System.Reactive.Linq
 open System.Threading.Tasks
 open System.Diagnostics
+open System.IO
 
 type Directory = 
     | None
@@ -95,9 +96,9 @@ let ui (state:EditorState) =
     let rec makeTree = function
         | None -> []
         | Directory (p, folders, files) as folder -> 
-            let filest = List.map( fun f -> TreeItem{title=f;elements=[];onTreeItemSelected=Some(fun () -> messages.OnNext(SelectFile f))}) files
+            let filest = List.map( fun f -> TreeItem{title=IO.Path.GetFileName f;elements=[];onTreeItemSelected=Some(fun () -> messages.OnNext(SelectFile f))}) files
             let folderst = List.map makeTree folders |> List.concat
-            [TreeItem{title=p;elements=folderst @ filest;onTreeItemSelected = Some(fun () ->messages.OnNext( ExpandFolder folder))}]
+            [TreeItem{title="\uD83D\uDCC1 " + DirectoryInfo(p).Name;elements=folderst @ filest;onTreeItemSelected = Some(fun () ->messages.OnNext( ExpandFolder folder))}]
 
     let tree = Tree <| makeTree state.currentFolder
     Dom.Dock [

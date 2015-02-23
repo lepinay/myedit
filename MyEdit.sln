@@ -14,7 +14,7 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MyEditFs", "MyEditFs\MyEdit
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyEdit.Wpf", "MyEdit.Wpf\MyEdit.Wpf.csproj", "{55F0E869-25E4-47D0-B3FE-18B5897F46F3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyEdit.Wpf.Controls", "MyEdit.Wpf.Controls\MyEdit.Wpf.Controls.csproj", "{771CD621-B0D3-4852-A813-346082DCAF31}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyEdit.Wpf.Controls", "MyEdit.Wpf.Controls\MyEdit.Wpf.Controls.csproj", "{F581C3D8-9CCD-4B2D-90F3-60521AC42D25}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -56,16 +56,16 @@ Global
 		{55F0E869-25E4-47D0-B3FE-18B5897F46F3}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{55F0E869-25E4-47D0-B3FE-18B5897F46F3}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{55F0E869-25E4-47D0-B3FE-18B5897F46F3}.Release|x86.ActiveCfg = Release|Any CPU
-		{771CD621-B0D3-4852-A813-346082DCAF31}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{771CD621-B0D3-4852-A813-346082DCAF31}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{771CD621-B0D3-4852-A813-346082DCAF31}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
-		{771CD621-B0D3-4852-A813-346082DCAF31}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
-		{771CD621-B0D3-4852-A813-346082DCAF31}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{771CD621-B0D3-4852-A813-346082DCAF31}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{771CD621-B0D3-4852-A813-346082DCAF31}.Release|Any CPU.Build.0 = Release|Any CPU
-		{771CD621-B0D3-4852-A813-346082DCAF31}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
-		{771CD621-B0D3-4852-A813-346082DCAF31}.Release|Mixed Platforms.Build.0 = Release|Any CPU
-		{771CD621-B0D3-4852-A813-346082DCAF31}.Release|x86.ActiveCfg = Release|Any CPU
+		{F581C3D8-9CCD-4B2D-90F3-60521AC42D25}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F581C3D8-9CCD-4B2D-90F3-60521AC42D25}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F581C3D8-9CCD-4B2D-90F3-60521AC42D25}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{F581C3D8-9CCD-4B2D-90F3-60521AC42D25}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{F581C3D8-9CCD-4B2D-90F3-60521AC42D25}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F581C3D8-9CCD-4B2D-90F3-60521AC42D25}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F581C3D8-9CCD-4B2D-90F3-60521AC42D25}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F581C3D8-9CCD-4B2D-90F3-60521AC42D25}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{F581C3D8-9CCD-4B2D-90F3-60521AC42D25}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{F581C3D8-9CCD-4B2D-90F3-60521AC42D25}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -24,6 +24,13 @@ This is where we have a fun and see how the baby is growing :smiley:
 
 ## Version 8
 
+- Optimized the diffing algo, things are now fast again but still some locking there and there that will need some investigation
+- Added some icons for folders
+
+![shot](/Versions/8.png) 
+
+## Version 8
+
 - Refactored diffing algo to take into account events subscriptions
 - New algo is much more slower so will need too optimize
 - Tree File browser fixed but will need more visual design :p

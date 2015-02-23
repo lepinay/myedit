@@ -15,7 +15,7 @@
         </DockPanel.Resources>
         <TextBlock VerticalAlignment="Center" x:Name="Title">File name</TextBlock>
 
-        <Rectangle x:Name="CloseButton" VerticalAlignment="Center" HorizontalAlignment="Right" Width="8" Height="8"  Margin="5,0,0,0">
+        <Rectangle x:Name="CloseButton" VerticalAlignment="Center" Width="8" Height="8"  Margin="5,0,5,0">
             <Rectangle.Fill>
                 <VisualBrush Visual="{StaticResource appbar_close}" />
             </Rectangle.Fill>

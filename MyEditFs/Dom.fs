@@ -23,7 +23,7 @@ type Element =
     | TreeItem of TreeItemElement
     | Editor of EditorElement
     | TabItem of TabItemElement
-    | TextArea of TextAreaElement
+    | AppendConsole of TextElement
     | Tab of Element list
     | Scroll of Element
 and [<CustomEquality;CustomComparison>]EditorElement =
@@ -62,20 +62,20 @@ and [<CustomEquality; CustomComparison>]MenuItemElement =
             | _ -> invalidArg "yobj" "cannot compare values of different types"
 
 
-and [<CustomEquality; CustomComparison>] TextAreaElement =
+and [<CustomEquality; CustomComparison>] TextElement =
     {   text: string;
         onReturn : (string -> unit) option
         onTextChanged : (string -> unit) option } 
     override x.Equals(yobj) =
         match yobj with
-        | :? TextAreaElement as y -> x.text = y.text
+        | :? TextElement as y -> x.text = y.text
         | _ -> false
  
     override x.GetHashCode() = hash x.text
     interface System.IComparable with
         member x.CompareTo yobj =
             match yobj with
-            | :? TextAreaElement as y -> compare x.text y.text
+            | :? TextElement as y -> compare x.text y.text
             | _ -> invalidArg "yobj" "cannot compare values of different types"
 
 

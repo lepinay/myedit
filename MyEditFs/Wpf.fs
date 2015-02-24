@@ -285,9 +285,10 @@ let rec render ui : VirtualDom =
 
             editor.Options.EnableRectangularSelection <- true
             Node {element=ui; ui=editor :> UIElement;subs=subs;childrens=[]}
-        | TextArea {text=s;onTextChanged=textChanged;onReturn=returnKey} -> 
+        | AppendConsole {text=s;onTextChanged=textChanged;onReturn=returnKey} -> 
             let editor = new TextEditor();
 
+            editor.IsReadOnly <- true
             editor.FontFamily <- FontFamily("Consolas")
             editor.Background <- bgColor
             editor.Foreground <- fgColor
@@ -387,7 +388,7 @@ let rec resolve (prev:VirtualDom list) (curr:Element list) : VirtualDom list =
                 scroll.Content <- uielt <| List.head child
                 scroll.ScrollToBottom()
                 Node{element=Scroll b;ui=z;childrens=child;subs=[]}::resolve xs ys
-            | (Node{element=TextArea {text=a};ui=z}::xs,(TextArea {text=b} as textb)::ys)  -> 
+            | (Node{element=AppendConsole {text=a};ui=z}::xs,(AppendConsole {text=b} as textb)::ys)  -> 
                 let tb = z :?> TextEditor
                 tb.AppendText("\n"+b)
                 tb.ScrollToEnd()

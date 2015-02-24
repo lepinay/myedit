@@ -118,7 +118,7 @@ let ui (state:EditorState) =
                             [
                                 Row(Tab tabs,0)
                                 Row(Splitter Horizontal,1)
-                                Row(TextArea {text = state.consoleOutput;onTextChanged = Option.None;onReturn = Option.None},2)
+                                Row(AppendConsole {text = state.consoleOutput;onTextChanged = Option.None;onReturn = Option.None},2)
                             ]),2)
             ])
     ]

@@ -114,11 +114,12 @@ let ui (state:EditorState) =
                 Dom.Column(Splitter Vertical,1)
                 Dom.Column(
                     Dom.Grid ([Star 1.],
-                            [Star 8.;Pixels 3.;Star 2.],
+                            [Star 8.;Pixels 3.;Star 2.;Auto],
                             [
                                 Row(Tab tabs,0)
                                 Row(Splitter Horizontal,1)
                                 Row(AppendConsole {text = state.consoleOutput;onTextChanged = Option.None;onReturn = Option.None},2)
+                                Row(Dom.TextBox {text = "> ";onTextChanged = Option.None;onReturn = Option.None},3)
                             ]),2)
             ])
     ]

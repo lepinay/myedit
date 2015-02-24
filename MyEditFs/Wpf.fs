@@ -286,6 +286,15 @@ let rec render ui : VirtualDom =
 
             editor.Options.EnableRectangularSelection <- true
             Node {element=ui; ui=editor :> UIElement;subs=subs;childrens=[]}
+        | TextBox {text=s;onTextChanged=textChanged;onReturn=returnKey} -> 
+            let tb = new TextBox();
+            tb.Text <- s;
+            tb.BorderBrush <- null
+            tb.Background <- bgColor
+            tb.Foreground <- fgColor
+
+//            let subs = [editor.TextChanged |> Observable.subscribe(fun e -> textChanged(doc)  )]
+            Node {element=ui; ui=tb :> UIElement;subs=[];childrens=[]}
         | AppendConsole {text=s;onTextChanged=textChanged;onReturn=returnKey} -> 
             let editor = new TextEditor();
 
@@ -393,6 +402,10 @@ let rec resolve (prev:VirtualDom list) (curr:Element list) : VirtualDom list =
                 let tb = z :?> TextEditor
                 tb.AppendText("\n"+b)
                 tb.ScrollToEnd()
+                Node{element=textb;ui=z;childrens=[];subs=[]}::resolve xs ys
+            | (Node{element=TextBox {text=a};ui=z}::xs,(TextBox {text=b} as textb)::ys)  -> 
+                let tb = z :?> TextBox
+                tb.Text <- b
                 Node{element=textb;ui=z;childrens=[];subs=[]}::resolve xs ys
             | (Node{element=Tree _;ui=z;childrens=a}::xs,(Tree b as treeb)::ys) ->
                 let tree = z :?> TreeView     

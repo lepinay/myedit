@@ -24,6 +24,7 @@ type Element =
     | Editor of EditorElement
     | TabItem of TabItemElement
     | AppendConsole of TextElement
+    | TextBox of TextElement
     | Tab of Element list
     | Scroll of Element
 and [<CustomEquality;CustomComparison>]EditorElement =

@@ -7,7 +7,7 @@ open System
 
 type Title = String
 type SplitterDirection = Horizontal | Vertical
-type Size = Star of float | Pixels of float
+type Size = Star of float | Pixels of float | Auto
 
 type Element = 
     | Docked of Element*Dock

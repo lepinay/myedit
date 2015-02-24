@@ -215,6 +215,7 @@ let rec render ui : VirtualDom =
             let sizeToLength = function
                 | Star n -> GridLength(n,GridUnitType.Star)
                 | Pixels n -> GridLength(n)
+                | Auto -> GridLength.Auto
             for row in rows do g.RowDefinitions.Add(new RowDefinition(Height=sizeToLength row))
             for col in cols do g.ColumnDefinitions.Add(new ColumnDefinition(Width=sizeToLength col))
             let childrens = xs |> List.map render

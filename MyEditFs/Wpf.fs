@@ -316,12 +316,6 @@ let domListToElemList doms =
     doms
     |> List.map (fun (Node{element=d}) -> d )
 
-let trace s y = 
-    Console.WriteLine( sprintf "%s %A" s y )
-
-let trace2 s y z = 
-    Console.WriteLine( sprintf "%s\n%A\ncompared to\n%A" s y z )
-
 let clearSubs (subs:IDisposable seq) = 
     for sub in subs do sub.Dispose()
 

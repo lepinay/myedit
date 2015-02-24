@@ -178,7 +178,6 @@ let run (script:string) =
                 proc.Close()
             )
 
-//type App = XAML<"App.xaml">
 let rec oneBefore files doc = 
     match files with
         | [] -> null

@@ -6,6 +6,7 @@ using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Media;
 
 namespace MyEdit.Wpf
 {
@@ -27,6 +28,7 @@ namespace MyEdit.Wpf
         [EntryPoint]
         public static void Main()
         {
+            //RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
             var application = new App();
             application.InitializeComponent();
             application.Run();

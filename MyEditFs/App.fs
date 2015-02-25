@@ -34,6 +34,7 @@ type Command =
     | SearchNext of string
     | SelectFile of string
     | ExpandFolder of Directory
+    | ShellCommand of String
 
 
 type TabState = {
@@ -49,6 +50,7 @@ type EditorState = {
     watches : (string) list
     consoleOutput : string
     currentFolder: Directory
+    prompt : String
 }
 
 
@@ -119,7 +121,7 @@ let ui (state:EditorState) =
                                 Row(Tab tabs,0)
                                 Row(Splitter Horizontal,1)
                                 Row(AppendConsole {text = state.consoleOutput;onTextChanged = Option.None;onReturn = Option.None},2)
-                                Row(Dom.TextBox {text = "> ";onTextChanged = Option.None;onReturn = Option.None},3)
+                                Row(Dom.TextBox {text = state.prompt ;onTextChanged = Some(fun s -> messages.OnNext(ShellCommand s));onReturn = Option.None},3)
                             ]),2)
             ])
     ]
@@ -133,6 +135,7 @@ let intialState = {
     consoleOutput=""
     current=null
     currentFolder=None 
+    prompt = ""
     }
 
 
@@ -280,6 +283,7 @@ let renderApp (w:Window) =
                         | other -> state
                 | OpenFolder s ->
                     {state with currentFolder=expandPath s }
+                | ShellCommand s -> {state with prompt = s}
                 | ExpandFolder d ->
                     {state with currentFolder = expandFolder state.currentFolder d })
         .ObserveOnDispatcher()

@@ -293,8 +293,11 @@ let rec render ui : VirtualDom =
             tb.Background <- bgColor
             tb.Foreground <- fgColor
 
-//            let subs = [editor.TextChanged |> Observable.subscribe(fun e -> textChanged(doc)  )]
-            Node {element=ui; ui=tb :> UIElement;subs=[];childrens=[]}
+            let subs = 
+                match textChanged with
+                    | Some(textChanged) -> [tb.KeyDown |> Observable.subscribe(fun e -> textChanged(tb.Text)  )]
+                    | None -> []
+            Node {element=ui; ui=tb :> UIElement;subs=subs;childrens=[]}
         | AppendConsole {text=s;onTextChanged=textChanged;onReturn=returnKey} -> 
             let editor = new TextEditor();
 
@@ -380,7 +383,6 @@ let rec resolve (prev:VirtualDom list) (curr:Element list) : VirtualDom list =
             | (Node{element=Row (_,pa);childrens=a;ui=z}::xs,(Row (b,pb))::ys) when pa = pb -> Node{element=Row(b,pb);ui=z;subs=[];childrens=resolve a [b]} :: resolve xs ys
             | (Node{element=Grid (acols,arows,_);ui=z;childrens=a}::xs,(Grid (bcols,brows,b) as gridb)::ys) when acols = bcols && arows = brows -> 
                 let grid = z :?> Grid     
-                let childrens = (collToList grid.Children)
                 let childrens = resolve a b 
                 for Node{ui=c} in childrens do 
                     if(not (grid.Children.Contains(c))) then grid.Children.Add(c) |> ignore
@@ -427,7 +429,6 @@ let rec resolve (prev:VirtualDom list) (curr:Element list) : VirtualDom list =
                 let childrens = resolve a b
                 for c in  childrens do tree.Items.Add(uielt c) |> ignore
                 Node{element=tib;ui=z;subs=newsubs;childrens=childrens}::resolve xs ys
-            
             | (_,y::ys) -> 
                 failwith <| sprintf "unable to reuse from %A" y
                 (render y)::resolve [] ys

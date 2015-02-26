@@ -4,6 +4,7 @@ open System.Windows.Controls
 open ICSharpCode.AvalonEdit.Document
 open System.Windows
 open System
+open Microsoft.FSharp.Reflection
 
 type Title = String
 type SplitterDirection = Horizontal | Vertical

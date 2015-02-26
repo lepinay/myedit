@@ -9,6 +9,9 @@ open ICSharpCode.AvalonEdit.Search
 open ICSharpCode.AvalonEdit.Folding
 open System
 open System.Windows.Documents
+open System.Windows.Input
+open MyEdit.Logging.EventSource
+
 
 let color s = new SimpleHighlightingBrush(downcast ColorConverter.ConvertFromString(s))
 let defaultColor = color "#FF0000"
@@ -297,6 +300,10 @@ let rec render ui : VirtualDom =
                 match textChanged with
                     | Some(textChanged) -> [tb.KeyDown |> Observable.subscribe(fun e -> textChanged(tb.Text)  )]
                     | None -> []
+                @
+                match returnKey with
+                    | Some(action) -> [tb.KeyDown |> Observable.subscribe(fun e -> if e.Key = Key.Return then action(tb.Text) )]
+                    | Option.None -> []
             Node {element=ui; ui=tb :> UIElement;subs=subs;childrens=[]}
         | AppendConsole {text=s;onTextChanged=textChanged;onReturn=returnKey} -> 
             let editor = new TextEditor();
@@ -312,6 +319,10 @@ let rec render ui : VirtualDom =
             
             let subs = 
                 match textChanged with
+                    | Some(action) -> [editor.TextChanged |> Observable.subscribe(fun e -> action(editor.Text)  )]
+                    | Option.None -> []
+                @
+                match returnKey with
                     | Some(action) -> [editor.TextChanged |> Observable.subscribe(fun e -> action(editor.Text)  )]
                     | Option.None -> []
             Node {element=ui; ui=editor :> UIElement;subs=subs;childrens=[]}
@@ -333,14 +344,17 @@ let domListToElemList doms =
 let clearSubs (subs:IDisposable seq) = 
     for sub in subs do sub.Dispose()
 
-let rec resolve (prev:VirtualDom list) (curr:Element list) : VirtualDom list = 
-    if domListToElemList prev = curr then prev 
+let rec resolve depth (prev:VirtualDom list) (curr:Element list) : VirtualDom list = 
+    if domListToElemList prev = curr then 
+        MyEditEventSource.Log.NoChange(depth)
+        prev 
     else 
         match (prev,curr) with
             | ([],[]) -> []
             | ([],y::ys) -> 
 //                Console.WriteLine (sprintf "render %A" y )
-                (render y)::resolve [] ys
+                MyEditEventSource.Log.Render(depth)
+                (render y)::resolve (depth+1) [] ys
             // UI element removed
             | (x::xs,[]) -> 
                 // for z in zs do ??? what should we do when ui element are removed from the UI, right now they should be GCed
@@ -348,75 +362,93 @@ let rec resolve (prev:VirtualDom list) (curr:Element list) : VirtualDom list =
                 // scary place here
                 []
             | (Node {element=x} as z::xs,y::ys) when x = y -> 
-                z::resolve xs ys
+                MyEditEventSource.Log.Reuse(depth)
+                z::resolve (depth+1) xs ys
             | (Node {element=TabItem {title=ta;id=ida};ui=ui;childrens=ea} as z::xs,(TabItem {title=tb;element=eb;selected=selb;id=idb} as tib)::ys) when ida = idb -> 
+                MyEditEventSource.Log.TabItem(depth)
                 let ti = ui :?> TabItem
                 let header = ti.Header :?> MyEdit.Wpf.Controls.TabItem
                 header.TabTitle.Text <- tb
                 ti.IsSelected <- selb
-                let childrens = resolve ea [eb]
+                let childrens = resolve (depth+1) ea [eb]
                 ti.Content <- uielt (List.head <| childrens)
 
                 // This won't handle the case where tabs were reordered since ys wont' have chance to go again trought all xs !
-                Node{element=tib;ui=ui;subs=[];childrens=childrens}::resolve xs ys
-            | (Node {element=TabItem {id=ida}}::xs,(TabItem {id=idb} as y)::ys) when ida <> idb -> resolve xs (y::ys)
+                Node{element=tib;ui=ui;subs=[];childrens=childrens}::resolve (depth+1) xs ys
+            | (Node {element=TabItem {id=ida}}::xs,(TabItem {id=idb} as y)::ys) when ida <> idb -> 
+                MyEditEventSource.Log.LookingForTabItem(depth)
+                resolve (depth+1) xs (y::ys)
             | (Node {element=Tab _;ui=z;childrens=a}::xs,(Tab b)::ys) -> 
+                MyEditEventSource.Log.TabControl(depth)
                 let tab = z :?> TabControl     
-                let childrens = resolve a b
+                let childrens = resolve (depth+1) a b
                 let childrensui = childrens |> List.map (fun (Node{ui=c}) -> c )
-                
                 for c in childrensui do 
                     if(not (tab.Items.Contains(c))) then tab.Items.Add(c) |> ignore
                 
                 let removals =  List.fold (fun state elt -> if childrensui |> List.exists (fun c -> c = elt) then state else elt::state ) [] (itemsToList tab.Items)
                 for r in removals do tab.Items.Remove(r)    
                                 
-                Node{element=Tab b;ui=z;childrens=childrens;subs=[]}::resolve xs ys
+                Node{element=Tab b;ui=z;childrens=childrens;subs=[]}::resolve (depth+1) xs ys
             | (Node{element=Dock _;ui=z;childrens=a}::xs,(Dock b as dockb)::ys) -> 
+                MyEditEventSource.Log.Dock(depth)
                 let dock = z :?> DockPanel     
-                let childrens = resolve a b 
+                let childrens = resolve (depth+1) a b 
                 for Node{ui=c} in childrens do 
                     if(not (dock.Children.Contains(c))) then dock.Children.Add(c) |> ignore
-                Node{element=dockb;ui=z;childrens=childrens;subs=[]}::resolve xs ys
-            | (Node{element=Docked (da,pa);childrens=a;ui=z}::xs,(Docked (db,pb))::ys) when pa = pb -> Node{element=Docked(db,pb);ui=z;subs=[];childrens=resolve a [db]} :: resolve xs ys
-            | (Node{element=Column (_,pa);childrens=a;ui=z}::xs,(Column (b,pb))::ys) when pa = pb -> Node{element=Column(b,pb);ui=z;subs=[];childrens=resolve a [b]} :: resolve xs ys
-            | (Node{element=Row (_,pa);childrens=a;ui=z}::xs,(Row (b,pb))::ys) when pa = pb -> Node{element=Row(b,pb);ui=z;subs=[];childrens=resolve a [b]} :: resolve xs ys
+                Node{element=dockb;ui=z;childrens=childrens;subs=[]}::resolve (depth+1) xs ys
+            | (Node{element=Docked (da,pa);childrens=a;ui=z}::xs,(Docked (db,pb))::ys) when pa = pb -> 
+                MyEditEventSource.Log.Docked(depth)
+                Node{element=Docked(db,pb);ui=z;subs=[];childrens=resolve (depth+1) a [db]} :: resolve (depth+1) xs ys
+            | (Node{element=Column (_,pa);childrens=a;ui=z}::xs,(Column (b,pb))::ys) when pa = pb -> 
+                MyEditEventSource.Log.Column(depth)
+                Node{element=Column(b,pb);ui=z;subs=[];childrens=resolve (depth+1) a [b]} :: resolve (depth+1) xs ys
+            | (Node{element=Row (_,pa);childrens=a;ui=z}::xs,(Row (b,pb))::ys) when pa = pb -> 
+                MyEditEventSource.Log.Row(depth)
+                Node{element=Row(b,pb);ui=z;subs=[];childrens=resolve (depth+1) a [b]} :: resolve (depth+1) xs ys
             | (Node{element=Grid (acols,arows,_);ui=z;childrens=a}::xs,(Grid (bcols,brows,b) as gridb)::ys) when acols = bcols && arows = brows -> 
+                MyEditEventSource.Log.Grid(depth)
                 let grid = z :?> Grid     
-                let childrens = resolve a b 
+                let childrens = resolve (depth+1) a b 
                 for Node{ui=c} in childrens do 
                     if(not (grid.Children.Contains(c))) then grid.Children.Add(c) |> ignore
-                Node{element=gridb;ui=z;childrens=childrens;subs=[]}::resolve xs ys
+                Node{element=gridb;ui=z;childrens=childrens;subs=[]}::resolve (depth+1) xs ys
             | (Node{element=Editor {doc=tda;selection=sela};ui=z}::xs,(Editor {doc=tdb;selection=selb} as editorb)::ys)  -> 
+                MyEditEventSource.Log.Editor(depth)
                 let editor = z :?> TextEditor
                 match selb with
                     | [(s,e)] -> editor.Select(s,e)
                     | [] -> editor.SelectionLength <- 0
                     | multiselect -> ()
-                Node{element=editorb;ui=z;childrens=[];subs=[]}::resolve xs ys
+                Node{element=editorb;ui=z;childrens=[];subs=[]}::resolve (depth+1) xs ys
             | (Node {element=Scroll _;ui=z;childrens=a}::xs,(Scroll b)::ys) -> 
+                MyEditEventSource.Log.Scroll(depth)
                 let scroll = z :?> ScrollViewer
-                let child = resolve a [b]
+                let child = resolve (depth+1) a [b]
                 scroll.Content <- uielt <| List.head child
                 scroll.ScrollToBottom()
-                Node{element=Scroll b;ui=z;childrens=child;subs=[]}::resolve xs ys
+                Node{element=Scroll b;ui=z;childrens=child;subs=[]}::resolve (depth+1) xs ys
             | (Node{element=AppendConsole {text=a};ui=z}::xs,(AppendConsole {text=b} as textb)::ys)  -> 
+                MyEditEventSource.Log.AppendConsole(depth)
                 let tb = z :?> TextEditor
                 tb.AppendText("\n"+b)
                 tb.ScrollToEnd()
-                Node{element=textb;ui=z;childrens=[];subs=[]}::resolve xs ys
+                Node{element=textb;ui=z;childrens=[];subs=[]}::resolve (depth+1) xs ys
             | (Node{element=TextBox {text=a};ui=z}::xs,(TextBox {text=b} as textb)::ys)  -> 
+                MyEditEventSource.Log.TextBox(depth)
                 let tb = z :?> TextBox
-                tb.Text <- b
-                Node{element=textb;ui=z;childrens=[];subs=[]}::resolve xs ys
+                if tb.Text <> b then tb.Text <- b
+                Node{element=textb;ui=z;childrens=[];subs=[]}::resolve (depth+1) xs ys
             | (Node{element=Tree _;ui=z;childrens=a}::xs,(Tree b as treeb)::ys) ->
+                MyEditEventSource.Log.TreeView(depth)
                 let tree = z :?> TreeView     
                 let childrens = (itemsToList tree.Items)
                 tree.Items.Clear()
-                let childrens = resolve a b
+                let childrens = resolve (depth+1) a b
                 for c in  childrens do tree.Items.Add(uielt c) |> ignore
-                Node{element=treeb;ui=z;childrens=childrens;subs=[]}::resolve xs ys
+                Node{element=treeb;ui=z;childrens=childrens;subs=[]}::resolve (depth+1) xs ys
             | (Node{element=TreeItem {elements=_};ui=z;childrens=a;subs=subs}::xs,(TreeItem {title=tb;elements=b;onTreeItemSelected=action} as tib)::ys) ->
+                MyEditEventSource.Log.TreeItem(depth)
                 clearSubs subs
                 let tree = z :?> TreeViewItem   
                 tree.Header <- tb
@@ -426,11 +458,12 @@ let rec resolve (prev:VirtualDom list) (curr:Element list) : VirtualDom list =
                         | None -> []
                 let childrens = (itemsToList tree.Items)
                 tree.Items.Clear()
-                let childrens = resolve a b
+                let childrens = resolve (depth+1) a b
                 for c in  childrens do tree.Items.Add(uielt c) |> ignore
-                Node{element=tib;ui=z;subs=newsubs;childrens=childrens}::resolve xs ys
+                Node{element=tib;ui=z;subs=newsubs;childrens=childrens}::resolve (depth+1) xs ys
             | (_,y::ys) -> 
+                MyEditEventSource.Log.ReuseFailure(depth)
                 failwith <| sprintf "unable to reuse from %A" y
-                (render y)::resolve [] ys
+                (render y)::resolve (depth+1) [] ys
             | other -> failwith <| sprintf "not handled:\nPREV\n%A\nCURR\n%A" prev curr
 

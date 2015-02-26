@@ -34,7 +34,8 @@ type Command =
     | SearchNext of string
     | SelectFile of string
     | ExpandFolder of Directory
-    | ShellCommand of String
+    | ShellCommandUpdating of String
+    | ShellCommandConfirmed of string
 
 
 type TabState = {
@@ -121,7 +122,7 @@ let ui (state:EditorState) =
                                 Row(Tab tabs,0)
                                 Row(Splitter Horizontal,1)
                                 Row(AppendConsole {text = state.consoleOutput;onTextChanged = Option.None;onReturn = Option.None},2)
-                                Row(Dom.TextBox {text = state.prompt ;onTextChanged = Some(fun s -> messages.OnNext(ShellCommand s));onReturn = Option.None},3)
+                                Row(Dom.TextBox {text = state.prompt ;onTextChanged = Some(fun s -> messages.OnNext(ShellCommandUpdating s));onReturn = Some(fun s -> messages.OnNext(ShellCommandConfirmed s))},3)
                             ]),2)
             ])
     ]
@@ -148,7 +149,7 @@ let intialState = {
 //let myRunSpace = RunspaceFactory.CreateRunspace(myHost);
 //myRunSpace.Open();
 
-let run (script:string) = 
+let run cmd = 
     Task.Run 
         (fun () ->
 //            use powershell = PowerShell.Create();
@@ -157,11 +158,12 @@ let run (script:string) =
 //            powershell.AddCommand("out-default") |> ignore
 //            powershell.Commands.Commands.[0].MergeMyResults(PipelineResultTypes.Error, PipelineResultTypes.Output);
 //            powershell.Invoke()
+
                 let pi = 
                     ProcessStartInfo 
                         (
                         FileName = "cmd",
-                        Arguments = "/c cd C:\perso\like && elm-make.exe main.elm --yes",
+                        Arguments = "/c " + cmd,
                         UseShellExecute = false,
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
@@ -223,7 +225,7 @@ let renderApp (w:Window) =
         for c in def.NamedHighlightingColors do 
             c.Foreground <- colors.[c.Name]
 
-    let initDom = resolve [] [ui intialState]
+    let initDom = resolve 0 [] [ui intialState]
     w.Content <- uielt (List.head <| initDom)
 
 
@@ -253,9 +255,10 @@ let renderApp (w:Window) =
                     let tstate = List.find (fun tsate -> tsate.doc = state.current) state.openFiles
                     IO.File.WriteAllText(tstate.doc.FileName,tstate.doc.Text)
 
-                    for cmd in state.watches do 
-                        let cwd s = "cd " +  IO.Path.GetDirectoryName tstate.doc.FileName + ";" + s
-                        cmd.Replace("%currentpath%", tstate.doc.FileName) |> cwd |> run |> ignore
+                    //for cmd in state.watches do 
+                    //    let cwd s = "cd " +  IO.Path.GetDirectoryName tstate.doc.FileName + ";" + s
+                    //    cmd.Replace("%currentpath%", tstate.doc.FileName) |> cwd |> run |> ignore
+                    run "cd C:\perso\like && elm-make.exe main.elm --yes" |> ignore
 
                     {state with openFiles= List.map(fun tstate' -> if tstate.doc = tstate'.doc then {tstate' with path = unstarize tstate'.path} else tstate') state.openFiles }      
                 | CommandOutput s ->
@@ -283,11 +286,14 @@ let renderApp (w:Window) =
                         | other -> state
                 | OpenFolder s ->
                     {state with currentFolder=expandPath s }
-                | ShellCommand s -> {state with prompt = s}
+                | ShellCommandUpdating s -> {state with prompt = s}
+                | ShellCommandConfirmed s -> 
+                    run s |> ignore
+                    state
                 | ExpandFolder d ->
                     {state with currentFolder = expandFolder state.currentFolder d })
         .ObserveOnDispatcher()
-        .Scan(initDom, fun dom state -> resolve dom [ui state] )
+        .Scan(initDom, fun dom state -> resolve 0 dom [ui state] )
         .Subscribe(function dom -> w.Content <- uielt (List.head dom) )
         |>ignore
 

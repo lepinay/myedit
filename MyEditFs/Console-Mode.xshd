@@ -5,6 +5,7 @@
     <Span fontWeight="bold" color="Error" begin="error" />
     <Span fontWeight="bold" color="Error" begin="Error" />
     <Span fontWeight="bold" color="Error" begin="Type error" />
+    <Span fontWeight="bold" color="Error" begin="Parse error" />
     <Span fontWeight="bold" color="Error" begin="Type mismatch" />
   </RuleSet>
 </SyntaxDefinition>

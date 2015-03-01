@@ -149,7 +149,7 @@ let intialState = {
 //let myRunSpace = RunspaceFactory.CreateRunspace(myHost);
 //myRunSpace.Open();
 
-let run cmd = 
+let run = 
     Task.Run 
         (fun () ->
 //            use powershell = PowerShell.Create();
@@ -163,26 +163,31 @@ let run cmd =
                     ProcessStartInfo 
                         (
                         FileName = "cmd",
-                        Arguments = "/c " + cmd,
+                        Arguments = "/K chcp 65001",
                         UseShellExecute = false,
                         RedirectStandardOutput = true,
+                        RedirectStandardInput = true,
                         RedirectStandardError = true,
+                        StandardOutputEncoding = Encoding.UTF8,
+                        StandardErrorEncoding = Encoding.UTF8,
                         CreateNoWindow = true )
                         
                 let proc = new System.Diagnostics.Process()
                 proc.StartInfo <- pi
-
                 proc.Start() |> ignore
                 proc.BeginErrorReadLine()
                 proc.BeginOutputReadLine()
                 let sb = StringBuilder()
 
-                use s1 = proc.OutputDataReceived |> Observable.subscribe(fun e -> messages.OnNext <| CommandOutput e.Data |> ignore)
-                use s2 = proc.ErrorDataReceived |> Observable.subscribe(fun e -> messages.OnNext <| CommandOutput e.Data |> ignore)
+                let s1 = proc.OutputDataReceived |> Observable.subscribe(fun e -> messages.OnNext <| CommandOutput e.Data |> ignore)
+                let s2 = proc.ErrorDataReceived |> Observable.subscribe(fun e -> messages.OnNext <| CommandOutput e.Data |> ignore)
                 
-                proc.WaitForExit()
-                proc.Close()
-            )
+                messages.Subscribe(fun msg ->
+                    match msg with
+                    | ShellCommandConfirmed s -> proc.StandardInput.WriteLineAsync(s) |> ignore
+                    | _ -> () )
+                )
+            
 
 let rec oneBefore files doc = 
     match files with
@@ -258,7 +263,7 @@ let renderApp (w:Window) =
                     //for cmd in state.watches do 
                     //    let cwd s = "cd " +  IO.Path.GetDirectoryName tstate.doc.FileName + ";" + s
                     //    cmd.Replace("%currentpath%", tstate.doc.FileName) |> cwd |> run |> ignore
-                    run "cd C:\perso\like && elm-make.exe main.elm --yes" |> ignore
+                    messages.OnNext(ShellCommandConfirmed "cd C:\perso\like && elm-make.exe main.elm --yes") |> ignore
 
                     {state with openFiles= List.map(fun tstate' -> if tstate.doc = tstate'.doc then {tstate' with path = unstarize tstate'.path} else tstate') state.openFiles }      
                 | CommandOutput s ->
@@ -287,11 +292,10 @@ let renderApp (w:Window) =
                 | OpenFolder s ->
                     {state with currentFolder=expandPath s }
                 | ShellCommandUpdating s -> {state with prompt = s}
-                | ShellCommandConfirmed s -> 
-                    run s |> ignore
-                    state
                 | ExpandFolder d ->
-                    {state with currentFolder = expandFolder state.currentFolder d })
+                    {state with currentFolder = expandFolder state.currentFolder d }
+                // TODO: create two different ADT to avoid this catch all !
+                | _ -> state)
         .ObserveOnDispatcher()
         .Scan(initDom, fun dom state -> resolve 0 dom [ui state] )
         .Subscribe(function dom -> w.Content <- uielt (List.head dom) )

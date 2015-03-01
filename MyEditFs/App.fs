@@ -292,10 +292,9 @@ let renderApp (w:Window) =
                 | OpenFolder s ->
                     {state with currentFolder=expandPath s }
                 | ShellCommandUpdating s -> {state with prompt = s}
+                | ShellCommandConfirmed s -> {state with prompt = ""}
                 | ExpandFolder d ->
-                    {state with currentFolder = expandFolder state.currentFolder d }
-                // TODO: create two different ADT to avoid this catch all !
-                | _ -> state)
+                    {state with currentFolder = expandFolder state.currentFolder d })
         .ObserveOnDispatcher()
         .Scan(initDom, fun dom state -> resolve 0 dom [ui state] )
         .Subscribe(function dom -> w.Content <- uielt (List.head dom) )

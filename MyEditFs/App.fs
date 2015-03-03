@@ -239,7 +239,11 @@ let renderApp (w:Window) =
     w.InputBindings.Add(new KeyBinding(saveCommand,Key.S,ModifierKeys.Control)) |> ignore
 //    w.InputBindings.Add(new KeyBinding(searchCommand,Key.F,ModifierKeys.Control)) |> ignore
 
-    let textChanged = messages.Where(function | TextChanged _ -> true | _ -> false).Throttle(TimeSpan.FromSeconds(1.))
+    let textChanged = 
+        messages
+            .Where(function | TextChanged _ -> true | SaveFile -> true | _ -> false)
+            .Throttle(TimeSpan.FromSeconds(1.))
+            .Where(function | TextChanged _ -> true | _ -> false)
     //let commandOutputs = messages.Where(function | CommandOutput s -> true | _ -> false).Buffer(TimeSpan.FromSeconds(2.),DispatcherScheduler.Current).Select(fun b -> CommandOutputBuffered b )
     let optMessages = messages.Where(function | TextChanged _ -> false | _ -> true).Merge(textChanged)
 

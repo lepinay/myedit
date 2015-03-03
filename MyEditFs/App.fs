@@ -177,11 +177,10 @@ let run =
                 proc.Start() |> ignore
                 proc.BeginErrorReadLine()
                 proc.BeginOutputReadLine()
-                let sb = StringBuilder()
+  
+                proc.OutputDataReceived |> Observable.subscribe(fun e -> messages.OnNext <| CommandOutput e.Data |> ignore) |> ignore
+                proc.ErrorDataReceived |> Observable.subscribe(fun e -> messages.OnNext <| CommandOutput e.Data |> ignore) |> ignore
 
-                let s1 = proc.OutputDataReceived |> Observable.subscribe(fun e -> messages.OnNext <| CommandOutput e.Data |> ignore)
-                let s2 = proc.ErrorDataReceived |> Observable.subscribe(fun e -> messages.OnNext <| CommandOutput e.Data |> ignore)
-                
                 messages.Subscribe(fun msg ->
                     match msg with
                     | ShellCommandConfirmed s -> proc.StandardInput.WriteLineAsync(s) |> ignore

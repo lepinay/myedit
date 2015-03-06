@@ -5,6 +5,7 @@ VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{34754D39-1E34-446A-9ACC-9DD81003C987}"
 	ProjectSection(SolutionItems) = preProject
+		Playground.fsx = Playground.fsx
 		README.md = README.md
 	EndProjectSection
 EndProject
@@ -19,6 +20,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyEdit.Logging", "MyEdit.Logging\MyEdit.Logging.csproj", "{2E23D4DE-569F-4469-AF05-7CBAD363B404}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyEdit.Logging.EventSource", "MyEdit.Logging.EventSource\MyEdit.Logging.EventSource.csproj", "{BC11916A-8C33-44D8-B3D4-21AB9A610160}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyEdit.AvalonEdit", "MyEdit.AvalonEdit\MyEdit.AvalonEdit.csproj", "{F9772430-F55F-4360-AFCC-87913B1CD504}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -92,6 +95,16 @@ Global
 		{BC11916A-8C33-44D8-B3D4-21AB9A610160}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{BC11916A-8C33-44D8-B3D4-21AB9A610160}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{BC11916A-8C33-44D8-B3D4-21AB9A610160}.Release|x86.ActiveCfg = Release|Any CPU
+		{F9772430-F55F-4360-AFCC-87913B1CD504}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F9772430-F55F-4360-AFCC-87913B1CD504}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F9772430-F55F-4360-AFCC-87913B1CD504}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{F9772430-F55F-4360-AFCC-87913B1CD504}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{F9772430-F55F-4360-AFCC-87913B1CD504}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F9772430-F55F-4360-AFCC-87913B1CD504}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F9772430-F55F-4360-AFCC-87913B1CD504}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F9772430-F55F-4360-AFCC-87913B1CD504}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{F9772430-F55F-4360-AFCC-87913B1CD504}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{F9772430-F55F-4360-AFCC-87913B1CD504}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

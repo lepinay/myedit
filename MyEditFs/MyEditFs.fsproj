@@ -193,6 +193,11 @@
       <Project>{136ffca6-292a-4e53-ad84-17534ce067d6}</Project>
       <Private>True</Private>
     </ProjectReference>
+    <ProjectReference Include="..\MyEdit.AvalonEdit\MyEdit.AvalonEdit.csproj">
+      <Name>MyEdit.AvalonEdit</Name>
+      <Project>{f9772430-f55f-4360-afcc-87913b1cd504}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <ProjectReference Include="..\MyEdit.Logging.EventSource\MyEdit.Logging.EventSource.csproj">
       <Name>MyEdit.Logging.EventSource</Name>
       <Project>{bc11916a-8c33-44d8-b3d4-21ab9a610160}</Project>

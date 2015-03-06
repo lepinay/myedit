@@ -12,6 +12,8 @@ open System.Windows.Documents
 open System.Windows.Input
 open MyEdit.Logging.EventSource
 open Microsoft.FSharp.Reflection
+open  MyEdit.AvalonEdit
+ open ICSharpCode.AvalonEdit.Rendering
 
 
 let color s = new SimpleHighlightingBrush(downcast ColorConverter.ConvertFromString(s))
@@ -163,6 +165,34 @@ let uielt dom =
     match dom with
         | Node {ui=elt} -> elt
 
+let explode (s:string) =  
+    if s <> null then [for c in s -> c]
+    else []
+
+let findMatch s pos = 
+    let rec _findMatch s curr pos opening closing = 
+        match s with
+            | x::xs when x = closing && curr = 1 -> Some (pos)
+            | x::xs when x = closing -> _findMatch xs (curr-1) (pos+1) opening closing
+            | x::xs when x = opening -> _findMatch xs (curr+1) (pos+1) opening closing
+            | x::xs ->  _findMatch xs (curr) (pos+1) opening closing
+            | [] -> None
+    if Seq.isEmpty s then None
+    else 
+        let closer = function
+                | '(' -> ')'
+                | '{' -> '}'
+                | '[' -> ']'
+                | other -> failwithf "Unreognized closing for %A" other
+        let skipped = (Seq.skip pos s |> Seq.toList)
+        match skipped with
+            | x::xs when not (Array.exists (fun i -> i = x) [|'(';'{';'['|])  -> None
+            | [] -> None
+            | x::xs -> 
+                match _findMatch skipped 0 0 x (closer x) with
+                    | Some(n) -> Some (n + pos)
+                    | None -> None
+
 
 let rec render ui : VirtualDom = 
 
@@ -266,6 +296,18 @@ let rec render ui : VirtualDom =
 
         | Editor {doc=doc;selection=selection;textChanged=textChanged} ->
             let editor = new TextEditor();
+            let brackets = new BracketHighlightRenderer()
+            editor.TextArea.TextView.BackgroundRenderers.Add(brackets)
+
+            editor.TextArea.KeyUp |> Observable.subscribe (fun e ->
+                match findMatch editor.Text editor.CaretOffset with
+                    | Some(n) ->
+                        brackets.SetHighlight(BracketSearchResult(OpeningBracketOffset=editor.CaretOffset,OpeningBracketLength=1,ClosingBracketOffset=n,ClosingBracketLength=1 ))
+                        editor.TextArea.TextView.InvalidateLayer(KnownLayer.Selection) 
+                    |None -> 
+                        brackets.SetHighlight(null)
+                        editor.TextArea.TextView.InvalidateLayer(KnownLayer.Selection) 
+                        ) |> ignore
 
             editor.SyntaxHighlighting <- HighlightingManager.Instance.GetDefinitionByExtension(IO.Path.GetExtension(doc.FileName));
             editor.Document <- doc;

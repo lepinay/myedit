@@ -32,41 +32,92 @@ let explode (s:string) =
     if s <> null then [for c in s -> c]
     else []
 
-let findMatch s pos = 
-    let rec _findMatch s curr pos opening (closing,dir) = 
-        match s with
-            | x::xs when x = closing && curr = 1 -> Some (pos)
-            | x::xs when x = closing -> _findMatch xs (curr-1) (pos+dir) opening (closing,dir)
-            | x::xs when x = opening -> _findMatch xs (curr+1) (pos+dir) opening (closing,dir)
-            | x::xs ->  _findMatch xs (curr) (pos+dir) opening (closing,dir)
-            | [] -> None
-    if Seq.isEmpty s then None
-    else 
-        let closer = function
-                | '(' -> (')',1)
-                | '{' -> ('}',1)
-                | '[' -> (']',1)
-                | ')' -> ('(',-1)
-                | '}' -> ('{',-1)
-                | ']' -> ('[',-1)
-                | other -> failwithf "Unreognized closing for %A" other
-        let skipped = (Seq.skip pos s |> Seq.toList)
-        match skipped with
-            | x::xs when not (Array.exists (fun i -> i = x) [|'(';'{';'[';']';'}';')'|])  -> None
-            | [] -> None
-            | x::xs -> 
-                match _findMatch skipped 0 0 x (closer x) with
-                    | Some(n) -> Some (n + pos)
-                    | None -> None
- 
-findMatch (explode "()") 0 |> should equal (Some 1)
-findMatch (explode "(())") 0 |> should equal (Some 3)
-findMatch (explode "(stuff())") 0 |> should equal (Some 8)
-findMatch (explode "(()") 0 |> should equal None
-findMatch (explode "(())") 1 |> should equal (Some 2)
-findMatch (explode ")(") 1 |> should equal None
-findMatch (explode "blabla()") 0 |> should equal None
-findMatch (explode "()") 1 |> should equal (Some 0)
+module Parser = 
+    type Token = Open of char*int | Close of int | None | Node of Token*Token list*Token
+
+    let parse s = 
+        let rec skipToEndOfLine pos s = 
+            match s with
+                | x::xs when x = '\n' -> (pos+1, xs)
+                | x::xs -> skipToEndOfLine (pos+1) xs
+                | [] -> (pos,s)
+        and skipComment pos s = 
+            match s with
+                | '-'::'-'::xs -> skipToEndOfLine (pos+2) xs
+                | _ -> (pos,s)
+        and parseOpen pos s = 
+            match s with
+                | x::xs when x = '(' || x = '{' || x = '['-> (Open (x,pos),xs,pos+1)
+                | x::xs when x = ')' || x = '}' || x = ']' -> (None,s,pos)
+                | x::xs -> parseOpen (pos+1) xs
+                | [] -> (None,s,pos)
+        and parseBody pos s =
+            let (next,snext,pnext) = _parse pos s
+            match next with
+                | None ->([],s,pos)
+                | _ ->
+                    let (tail,stail,ptail) = parseBody pnext snext
+                    (next::tail,stail,ptail)
+        and parseClose c pos s = 
+            match s with
+                | x::xs when x = c -> (Close pos,xs,pos+1)
+                | x::xs when x = '(' && c = ')'  -> (None,s,pos)
+                | x::xs when x = '{' && c = '}'  -> (None,s,pos)
+                | x::xs when x = '[' && c = ']'  -> (None,s,pos)
+                | x::xs -> parseClose c (pos+1) xs
+                | [] -> (None,s,pos)
+        and _parse pos s =
+            let (coms,comp) = skipComment pos s
+            let (left,sa,pa) = parseOpen coms comp
+            let sym = function |'(' -> ')'|'{'-> '}'| '[' -> ']' | _ -> failwith "NA"
+            match left with
+                | Open (c,p) ->
+                    let (body,sb,pb) = parseBody pa sa
+                    let (right,sc,pc) = parseClose (sym c) pb sb
+                    (Node(left, body, right),sc,pc)
+                | _ -> (None,s,pos)
+
+
+        let (res,_,_) = parseBody 0 (explode s)
+        res
+
+    let findMatch s pos = 
+        let tree = parse s
+        let rec _findMatch tree pos = 
+            match tree with
+                | Node (Open (_,a), xxs, Close b)::xs when a = pos -> Some(b)
+                | Node (Open (_,a), xxs, Close b)::xs when b = pos -> Some(a)
+                | Node (Open (_,a), xxs, Close b)::xs when pos > a && pos < b -> _findMatch xxs pos
+                | x::xs -> _findMatch xs pos
+                | [] -> Option.None
+        _findMatch tree pos
+    
+
+open Parser        
+parse ""  |> should equal []
+parse "-- ()"  |> should equal []
+parse "()" |> should equal <| [Node (Open ('(',0), [], Close 1)]
+parse "()()" |> should equal <| [Node (Open ('(',0),[],Close 1); Node (Open 2,[],Close 3)]
+parse "(abcd)" |> should equal <| [Node (Open ('(',0), [], Close 5)]
+parse "() -- comment" |> should equal <| [Node (Open ('(',0), [], Close 1)]
+parse """-- comment 
+()""" |> should equal <| [Node (Open ('(',12), [], Close 13)]
+parse """-- (comment )
+()""" |> should equal <| [Node (Open ('(',14), [], Close 15)]
+parse "(()" |> should equal <| [Node (Open ('(',0), [Node (Open ('(',1),[],Close 2)], None)]
+parse "(())" |> should equal <| [Node (Open ('(',0), [Node (Open ('(',1),[],Close 2)], Close 3)]
+parse "(()())" |> should equal <| [Node (Open ('(',0), [Node (Open ('(',1),[],Close 2);Node (Open ('(',0),[],Close 4)], Close 5)]
+
+findMatch "()" 0 |> should equal (Some 1)
+findMatch "[]" 0 |> should equal (Some 1)
+findMatch "(())" 0 |> should equal (Some 3)
+findMatch "()()" 2 |> should equal (Some 3)
+findMatch "(stuff())" 0 |> should equal (Some 8)
+findMatch "(()" 0 |> should equal Option.None
+findMatch "(())" 1 |> should equal (Some 2)
+findMatch ")(" 1 |> should equal Option.None
+findMatch "blabla()" 0 |> should equal Option.None
+findMatch "()" 1 |> should equal (Some 0)
 
 
 let willNeverFindMatchInEmptyList (e:int) = findMatch (explode "") e = None

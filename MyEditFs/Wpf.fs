@@ -169,30 +169,66 @@ let explode (s:string) =
     if s <> null then [for c in s -> c]
     else []
 
-let findMatch s pos = 
-    let rec _findMatch s curr pos opening closing = 
-        match s with
-            | x::xs when x = closing && curr = 1 -> Some (pos)
-            | x::xs when x = closing -> _findMatch xs (curr-1) (pos+1) opening closing
-            | x::xs when x = opening -> _findMatch xs (curr+1) (pos+1) opening closing
-            | x::xs ->  _findMatch xs (curr) (pos+1) opening closing
-            | [] -> None
-    if Seq.isEmpty s then None
-    else 
-        let closer = function
-                | '(' -> ')'
-                | '{' -> '}'
-                | '[' -> ']'
-                | other -> failwithf "Unreognized closing for %A" other
-        let skipped = (Seq.skip pos s |> Seq.toList)
-        match skipped with
-            | x::xs when not (Array.exists (fun i -> i = x) [|'(';'{';'['|])  -> None
-            | [] -> None
-            | x::xs -> 
-                match _findMatch skipped 0 0 x (closer x) with
-                    | Some(n) -> Some (n + pos)
-                    | None -> None
 
+module Parser = 
+    type Token = Open of char*int | Close of int | None | Node of Token*Token list*Token
+
+    let parse s = 
+        let rec skipToEndOfLine pos s = 
+            match s with
+                | x::xs when x = '\n' -> (pos+1, xs)
+                | x::xs -> skipToEndOfLine (pos+1) xs
+                | [] -> (pos,s)
+        and skipComment pos s = 
+            match s with
+                | '-'::'-'::xs -> skipToEndOfLine (pos+2) xs
+                | _ -> (pos,s)
+        and parseOpen pos s = 
+            match s with
+                | x::xs when x = '(' || x = '{' || x = '['-> (Open (x,pos),xs,pos+1)
+                | x::xs when x = ')' || x = '}' || x = ']' -> (None,s,pos)
+                | x::xs -> parseOpen (pos+1) xs
+                | [] -> (None,s,pos)
+        and parseBody pos s =
+            let (next,snext,pnext) = _parse pos s
+            match next with
+                | None ->([],s,pos)
+                | _ ->
+                    let (tail,stail,ptail) = parseBody pnext snext
+                    (next::tail,stail,ptail)
+        and parseClose c pos s = 
+            match s with
+                | x::xs when x = c -> (Close pos,xs,pos+1)
+                | x::xs when x = '(' && c = ')'  -> (None,s,pos)
+                | x::xs when x = '{' && c = '}'  -> (None,s,pos)
+                | x::xs when x = '[' && c = ']'  -> (None,s,pos)
+                | x::xs -> parseClose c (pos+1) xs
+                | [] -> (None,s,pos)
+        and _parse pos s =
+            let (coms,comp) = skipComment pos s
+            let (left,sa,pa) = parseOpen coms comp
+            let sym = function |'(' -> ')'|'{'-> '}'| '[' -> ']' | _ -> failwith "NA"
+            match left with
+                | Open (c,p) ->
+                    let (body,sb,pb) = parseBody pa sa
+                    let (right,sc,pc) = parseClose (sym c) pb sb
+                    (Node(left, body, right),sc,pc)
+                | _ -> (None,s,pos)
+
+
+        let (res,_,_) = parseBody 0 (explode s)
+        res
+
+    let findMatch s pos = 
+        let tree = parse s
+        let rec _findMatch tree pos = 
+            match tree with
+                | Node (Open (_,a), xxs, Close b)::xs when a = pos -> Some(b)
+                | Node (Open (_,a), xxs, Close b)::xs when b = pos -> Some(a)
+                | Node (Open (_,a), xxs, Close b)::xs when pos > a && pos < b -> _findMatch xxs pos
+                | x::xs -> _findMatch xs pos
+                | [] -> Option.None
+        _findMatch tree pos
 
 let rec render ui : VirtualDom = 
 
@@ -300,7 +336,7 @@ let rec render ui : VirtualDom =
             editor.TextArea.TextView.BackgroundRenderers.Add(brackets)
 
             editor.TextArea.KeyUp |> Observable.subscribe (fun e ->
-                match findMatch editor.Text editor.CaretOffset with
+                match Parser.findMatch editor.Text editor.CaretOffset with
                     | Some(n) ->
                         brackets.SetHighlight(BracketSearchResult(OpeningBracketOffset=editor.CaretOffset,OpeningBracketLength=1,ClosingBracketOffset=n,ClosingBracketLength=1 ))
                         editor.TextArea.TextView.InvalidateLayer(KnownLayer.Selection) 

@@ -25,7 +25,18 @@ let explode (s:string) =
     else []
 
 module Parser = 
-    type Token = Open of char*int | Close of int | None | Node of Token*Token list*Token
+
+    type Token = Open of char*int | Close of int | None | Node of Token*Token list*Token | Comment
+
+    type Context =  {
+        position:int
+        content:char list
+    }
+
+    type Parser<'a> = Context -> ('a*Context)
+
+
+    let bind parser cont = (fun context -> cont (parser context) )
 
     let parse s = 
         let rec skipToEndOfLine pos s = 
@@ -33,10 +44,12 @@ module Parser =
                 | x::xs when x = '\n' -> (pos+1, xs)
                 | x::xs -> skipToEndOfLine (pos+1) xs
                 | [] -> (pos,s)
-        and skipComment pos s = 
+        and skipComment context = 
             match s with
-                | '-'::'-'::xs -> skipToEndOfLine (pos+2) xs
-                | _ -> (pos,s)
+                | '-'::'-'::xs -> 
+                    let (nextpos,nexts) = skipToEndOfLine (context.position+2) xs
+                    {position=nextpos;content=nexts;value=Comment}
+                | _ -> {position=context.position;content=s;value=None}
         and parseOpen pos s = 
             match s with
                 | x::xs when x = '(' || x = '{' || x = '['-> (Open (x,pos),xs,pos+1)
@@ -59,15 +72,17 @@ module Parser =
                 | x::xs -> parseClose c (pos+1) xs
                 | [] -> (None,s,pos)
         and _parse pos s =
-            let (coms,comp) = skipComment pos s
-            let (left,sa,pa) = parseOpen coms comp
-            let sym = function |'(' -> ')'|'{'-> '}'| '[' -> ']' | _ -> failwith "NA"
-            match left with
-                | Open (c,p) ->
-                    let (body,sb,pb) = parseBody pa sa
-                    let (right,sc,pc) = parseClose (sym c) pb sb
-                    (Node(left, body, right),sc,pc)
-                | _ -> (None,s,pos)
+            bind (skipComment pos s) (fun context ->
+                let (left,sa,pa) = parseOpen context.coms context.position
+                let sym = function |'(' -> ')'|'{'-> '}'| '[' -> ']' | _ -> failwith "NA"
+                match left with
+                    | Open (c,p) ->
+                        let (body,sb,pb) = parseBody pa sa
+                        let (right,sc,pc) = parseClose (sym c) pb sb
+                        (Node(left, body, right),sc,pc)
+                    | _ -> (None,s,pos)
+            )
+
 
 
         let (res,_,_) = parseBody 0 (explode s)

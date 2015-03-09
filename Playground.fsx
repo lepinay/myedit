@@ -34,7 +34,9 @@ module Parser =
     }
 
     type Parser<'a> = Context -> ('a*Context)
-    let bind parser cont = (fun context -> cont (parser context) )
+    let bind parser cont = (fun context -> 
+        let (res,context') = parser context
+        (cont res) context')
     let ret a = (fun context -> (a,context) )
 
     let parse s = 

@@ -34,9 +34,8 @@ module Parser =
     }
 
     type Parser<'a> = Context -> ('a*Context)
-
-
     let bind parser cont = (fun context -> cont (parser context) )
+    let ret a = (fun context -> (a,context) )
 
     let parse s = 
         let rec skipToEndOfLine pos s = 

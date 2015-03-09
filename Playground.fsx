@@ -12,21 +12,13 @@ if not (File.Exists "paket.exe") then
  
 Paket.Dependencies.Install """
     source https://nuget.org/api/v2
-    nuget FsUnit
-    nuget FsUnit.Xunit
-    nuget XUnit
-    nuget FsCheck
+    nuget Unquote
 """;;
  
  
-#r @"packages\xunit\lib\net20\Xunit.dll"
 #r @"packages\FsCheck\lib\net45\FsCheck.dll"
-#r @"packages\FsUnit.xUnit\Lib\net40\NHamcrest.dll"
-#r @"packages\FsUnit.xUnit\Lib\net40\FsUnit.CustomMatchers.dll"
-#r @"packages\FsUnit.xUnit\Lib\net40\FsUnit.Xunit.dll"
+#r @"packages\Unquote\lib\net40\Unquote.dll"
 
-open FsUnit.Xunit
-open FsCheck
 
 let explode (s:string) =  
     if s <> null then [for c in s -> c]
@@ -93,37 +85,40 @@ module Parser =
         _findMatch tree pos
     
 
-open Parser        
-parse ""  |> should equal []
-parse "-- ()"  |> should equal []
-parse "()" |> should equal <| [Node (Open ('(',0), [], Close 1)]
-parse "()()" |> should equal <| [Node (Open ('(',0),[],Close 1); Node (Open 2,[],Close 3)]
-parse "(abcd)" |> should equal <| [Node (Open ('(',0), [], Close 5)]
-parse "() -- comment" |> should equal <| [Node (Open ('(',0), [], Close 1)]
-parse """-- comment 
-()""" |> should equal <| [Node (Open ('(',12), [], Close 13)]
-parse """-- (comment )
-()""" |> should equal <| [Node (Open ('(',14), [], Close 15)]
-parse "(()" |> should equal <| [Node (Open ('(',0), [Node (Open ('(',1),[],Close 2)], None)]
-parse "(())" |> should equal <| [Node (Open ('(',0), [Node (Open ('(',1),[],Close 2)], Close 3)]
-parse "(()())" |> should equal <| [Node (Open ('(',0), [Node (Open ('(',1),[],Close 2);Node (Open ('(',0),[],Close 4)], Close 5)]
+open Parser      
+open Swensen.Unquote
+open FsCheck
 
-findMatch "()" 0 |> should equal (Some 1)
-findMatch "[]" 0 |> should equal (Some 1)
-findMatch "(())" 0 |> should equal (Some 3)
-findMatch "()()" 2 |> should equal (Some 3)
-findMatch "(stuff())" 0 |> should equal (Some 8)
-findMatch "(()" 0 |> should equal Option.None
-findMatch "(())" 1 |> should equal (Some 2)
-findMatch ")(" 1 |> should equal Option.None
-findMatch "blabla()" 0 |> should equal Option.None
-findMatch "()" 1 |> should equal (Some 0)
+test <@ parse ""  = [] @>
+test <@ parse "-- ()"  = [] @>
+test <@ parse "()" = [Node (Open ('(',0), [], Close 1)] @>
+test <@ parse "()()" = [Node (Open ('(',0),[],Close 1); Node (Open ('(', 2),[],Close 3)] @>
+test <@ parse "(abcd)" = [Node (Open ('(',0), [], Close 5)] @>
+test <@ parse "() -- comment" = [Node (Open ('(',0), [], Close 1)] @>
+test <@ parse """-- comment  
+()""" = [Node (Open ('(',13), [], Close 14)] @>
+test <@ parse """-- (comment ) 
+()""" = [Node (Open ('(',15), [], Close 16)] @>
+test <@ parse "(()" = [Node (Open ('(',0), [Node (Open ('(',1),[],Close 2)], None)] @>
+test <@ parse "(())" = [Node (Open ('(',0), [Node (Open ('(',1),[],Close 2)], Close 3)] @>
+test <@ parse "(()())" = [Node (Open ('(',0), [Node (Open ('(',1),[],Close 2); Node (Open ('(',3),[],Close 4)],Close 5)] @>
+
+test <@findMatch "()" 0 = (Some 1) @>
+test <@findMatch "[]" 0 = (Some 1) @>
+test <@findMatch "(())" 0 = (Some 3) @>
+test <@findMatch "()()" 2 = (Some 3) @>
+test <@findMatch "(stuff())" 0 = (Some 8) @>
+test <@findMatch "(()" 0 = Option.None @>
+test <@findMatch "(())" 1 = (Some 2) @>
+test <@findMatch ")(" 1 = Option.None @>
+test <@findMatch "blabla()" 0 = Option.None @>
+test <@findMatch "()" 1 = (Some 0) @>
 
 
-let willNeverFindMatchInEmptyList (e:int) = findMatch (explode "") e = None
+let willNeverFindMatchInEmptyList (e:int) = findMatch "" e = Option.None
 Check.Quick willNeverFindMatchInEmptyList
 
-type SymParens = SymParens of char seq with
+type SymParens = SymParens of string with
   static member op_Explicit(SymParens s) = s
 
 type MyGenerators =
@@ -131,16 +126,14 @@ type MyGenerators =
       {new Arbitrary<SymParens>() with
           override x.Generator = gen {
                 let! i = Gen.choose(1,100)
-                let a = List.replicate i '('
-                let b = List.replicate i ')'
-                return SymParens (Seq.concat [a;b])
+                let a = List.replicate i "("
+                let b = List.replicate i ")"
+                return SymParens (Seq.concat [a;b] |> Seq.reduce (+) )
             }
           override x.Shrinker t = Seq.empty }
         
 Arb.register<MyGenerators>()
 
 
-let willAlwaysFindParensInTheEnd (SymParens e) = 
-    printfn "input length %d" (Seq.length e)
-    findMatch e 0 = Some(Seq.length e - 1)
+let willAlwaysFindParensInTheEnd (SymParens e) =  findMatch e 0 = Some(Seq.length e - 1)
 Check.Quick willAlwaysFindParensInTheEnd

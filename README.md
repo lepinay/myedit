@@ -22,6 +22,13 @@ Why am I writing my own code editor ?
 
 This is where we have a fun and see how the baby is growing :smiley:
 
+## Version 11
+
+- Coded up a parens/brackets matcher, this is a missing feature in avalon edit
+- Code for the matcher will need some cleaning, will try to implement parser combinator instead / fsharp workflow
+
+![shot](/Versions/11.gif) 
+
 ## Version 10
 
 - More optimz, I've switched the console from a textbox to an avalon edit control. This will enable better throughtput and syntax highlighting !

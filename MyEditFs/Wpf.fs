@@ -332,7 +332,7 @@ let rec render ui : VirtualDom =
 
         | Editor {doc=doc;selection=selection;textChanged=textChanged} ->
             let editor = new TextEditor();
-            let brackets = new BracketHighlightRenderer()
+            let brackets = new BracketHighlightRenderer(colors.["FindHighlight"].GetColor(null),colors.["FindHighlight"].GetColor(null))
             editor.TextArea.TextView.BackgroundRenderers.Add(brackets)
 
             editor.TextArea.KeyUp |> Observable.subscribe (fun e ->

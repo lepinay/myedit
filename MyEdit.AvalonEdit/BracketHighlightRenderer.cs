@@ -31,8 +31,6 @@ namespace MyEdit.AvalonEdit
         Pen borderPen;
         Brush backgroundBrush;
 
-        public static readonly Color DefaultBackground = Color.FromArgb(255, 0, 0, 255);
-        public static readonly Color DefaultBorder = Color.FromArgb(255, 0, 0, 255);
 
         public const string BracketHighlight = "Bracket highlight";
 
@@ -44,9 +42,9 @@ namespace MyEdit.AvalonEdit
             }
         }
 
-        public BracketHighlightRenderer()
+        public BracketHighlightRenderer(Color? defaultBackground, Color? defaultBorder)
         {
-            this.UpdateColors(DefaultBackground, DefaultBorder);
+            this.UpdateColors(Color.FromArgb(0,0,0,0), defaultBorder.Value);
         }
 
         void UpdateColors(Color background, Color foreground)
@@ -85,11 +83,6 @@ namespace MyEdit.AvalonEdit
             {
                 drawingContext.DrawGeometry(backgroundBrush, borderPen, geometry);
             }
-        }
-
-        public static void ApplyCustomizationsToRendering(BracketHighlightRenderer renderer)
-        {
-            renderer.UpdateColors(DefaultBackground, DefaultBorder);
         }
 
         public BracketSearchResult result { get; set; }

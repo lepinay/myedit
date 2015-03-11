@@ -57,21 +57,21 @@ module Parser =
                 | x::xs when x = ')' || x = '}' || x = ']' -> (None,context)
                 | x::xs -> parseOpen {position=(context.position+1);content=xs}
                 | [] -> (None,context)
-        and parseBody pos s =
-            let (next,snext,pnext) = _parse pos s
+        and parseBody context =
+            let (next,nextContext) = _parse context.position context.content
             match next with
-                | None ->([],s,pos)
+                | None ->([],context)
                 | _ ->
-                    let (tail,stail,ptail) = parseBody pnext snext
-                    (next::tail,stail,ptail)
-        and parseClose c pos s = 
-            match s with
-                | x::xs when x = c -> (Close pos,xs,pos+1)
-                | x::xs when x = '(' && c = ')'  -> (None,s,pos)
-                | x::xs when x = '{' && c = '}'  -> (None,s,pos)
-                | x::xs when x = '[' && c = ']'  -> (None,s,pos)
-                | x::xs -> parseClose c (pos+1) xs
-                | [] -> (None,s,pos)
+                    let (tail,tailc) = parseBody nextContext
+                    (next::tail,tailc)
+        and parseClose c context = 
+            match context.content with
+                | x::xs when x = c -> (Close context.position,{content=xs;position=context.position+1})
+                | x::xs when x = '(' && c = ')'  -> (None,context)
+                | x::xs when x = '{' && c = '}'  -> (None,context)
+                | x::xs when x = '[' && c = ']'  -> (None,context)
+                | x::xs -> parseClose c {position=context.position+1;content=xs}
+                | [] -> (None,context)
         and _parse pos s =
             bind 
                 skipComment 
@@ -84,17 +84,23 @@ module Parser =
                                     let sym = function |'(' -> ')'|'{'-> '}'| '[' -> ']' | _ -> failwith "NA"
                                     match left with
                                         | Open (c,p) ->
-                                            let (body,sb,pb) = parseBody context.position context.content
-                                            let (right,sc,pc) = parseClose (sym c) pb sb
-                                            (Node(left, body, right),sc,pc)
-                                        | _ -> (None,s,pos)
+                                            bind
+                                                parseBody
+                                                (fun body ->
+                                                    (fun context ->
+                                                        let (right,nextContext) = parseClose (sym c) context
+                                                        (Node(left, body, right),nextContext)
+                                                    )
+                                                )
+                                                context
+                                        | _ -> (None,context)
                                 )
                             )
                             context
                     )
                 )({position=pos; content = s})
 
-        let (res,_,_) = parseBody 0 (explode s)
+        let (res,_) = parseBody {position=0;content=(explode s)}
         res
 
     let findMatch s pos = 

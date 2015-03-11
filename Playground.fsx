@@ -39,35 +39,39 @@ module Parser =
         (cont res) context')
     let ret a = (fun context -> (a,context) )
 
+    type ParserBuilder() =
+        member x.Bind(comp, func) = bind comp func
+        member x.Return(value) = ret value
+
+    let parser = new ParserBuilder()
+
     let parse (s:string) = 
         let rec skipToEndOfLine pos s = 
             match s with
                 | x::xs when x = '\n' -> (pos+1, xs)
                 | x::xs -> skipToEndOfLine (pos+1) xs
                 | [] -> (pos,s)
-        and skipComment context = 
+        let comment context = 
             match context.content with
                 | '-'::'-'::xs -> 
                     let (nextpos,nexts) = skipToEndOfLine (context.position+2) xs
                     (Comment,{position=nextpos;content=nexts})
                 | _ -> (None,{position=context.position;content=context.content})
-        and parseOpen context = 
+        let rec parseOpen context = 
             match context.content with
                 | x::xs when x = '(' || x = '{' || x = '['-> (Open (x,context.position),{content=xs;position=context.position+1})
                 | x::xs when x = ')' || x = '}' || x = ']' -> (None,context)
                 | x::xs -> parseOpen {position=(context.position+1);content=xs}
                 | [] -> (None,context)
-        and parseBody =
-            bind 
-                _parse 
-                (fun next -> 
-                    match next with
-                    | None ->ret []
+        let rec parseBody =
+            parser {
+                let! next = _parse
+                match next with
+                    | None ->return []
                     | _ ->
-                        bind
-                            parseBody
-                            (fun tail -> ret (next::tail) )
-                )
+                        let! tail = parseBody
+                        return next::tail
+            }
         and parseClose c context = 
             match context.content with
                 | x::xs when x = c -> (Close context.position,{content=xs;position=context.position+1})
@@ -77,16 +81,18 @@ module Parser =
                 | x::xs -> parseClose c {position=context.position+1;content=xs}
                 | [] -> (None,context)
         and _parse  =
-            bind skipComment (fun com ->
-            bind parseOpen (fun left ->
-                    let sym = function |'(' -> ')'|'{'-> '}'| '[' -> ']' | _ -> failwith "NA"
-                    match left with
-                        | Open (c,p) ->
-                            bind parseBody (fun body ->
-                            bind (parseClose (sym c)) (fun right -> ret (Node(left, body, right)) )
-                                )
-                        | _ -> ret None
-                ))
+            parser {
+                let! com = comment
+                let! left = parseOpen
+                let sym = function |'(' -> ')'|'{'-> '}'| '[' -> ']' | _ -> failwith "NA"
+                match left with
+                    | Open (c,p) ->
+                        let! body = parseBody 
+                        let! right = parseClose (sym c)
+                        return Node(left, body, right)
+                    | _ ->return None
+            }
+
 
         let (res,_) = parseBody {position=0;content=(explode s)}
         res

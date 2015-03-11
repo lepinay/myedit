@@ -34,7 +34,7 @@ module Parser =
     }
 
     type Parser<'a> = Context -> ('a*Context)
-    let bind parser cont = (fun context -> 
+    let bind (parser:Parser<'a>) (cont:'a->Parser<'b>) = (fun context -> 
         let (res,context') = parser context
         (cont res) context')
     let ret a = (fun context -> (a,context) )
@@ -57,13 +57,17 @@ module Parser =
                 | x::xs when x = ')' || x = '}' || x = ']' -> (None,context)
                 | x::xs -> parseOpen {position=(context.position+1);content=xs}
                 | [] -> (None,context)
-        and parseBody context =
-            let (next,nextContext) = _parse context.position context.content
-            match next with
-                | None ->([],context)
-                | _ ->
-                    let (tail,tailc) = parseBody nextContext
-                    (next::tail,tailc)
+        and parseBody =
+            bind 
+                _parse 
+                (fun next -> 
+                    match next with
+                    | None ->ret []
+                    | _ ->
+                        bind
+                            parseBody
+                            (fun tail -> ret (next::tail) )
+                )
         and parseClose c context = 
             match context.content with
                 | x::xs when x = c -> (Close context.position,{content=xs;position=context.position+1})
@@ -72,33 +76,17 @@ module Parser =
                 | x::xs when x = '[' && c = ']'  -> (None,context)
                 | x::xs -> parseClose c {position=context.position+1;content=xs}
                 | [] -> (None,context)
-        and _parse pos s =
-            bind 
-                skipComment 
-                (fun com ->
-                    (fun context ->
-                        bind 
-                            parseOpen
-                            (fun left ->
-                                (fun context -> 
-                                    let sym = function |'(' -> ')'|'{'-> '}'| '[' -> ']' | _ -> failwith "NA"
-                                    match left with
-                                        | Open (c,p) ->
-                                            bind
-                                                parseBody
-                                                (fun body ->
-                                                    (fun context ->
-                                                        let (right,nextContext) = parseClose (sym c) context
-                                                        (Node(left, body, right),nextContext)
-                                                    )
-                                                )
-                                                context
-                                        | _ -> (None,context)
+        and _parse  =
+            bind skipComment (fun com ->
+            bind parseOpen (fun left ->
+                    let sym = function |'(' -> ')'|'{'-> '}'| '[' -> ']' | _ -> failwith "NA"
+                    match left with
+                        | Open (c,p) ->
+                            bind parseBody (fun body ->
+                            bind (parseClose (sym c)) (fun right -> ret (Node(left, body, right)) )
                                 )
-                            )
-                            context
-                    )
-                )({position=pos; content = s})
+                        | _ -> ret None
+                ))
 
         let (res,_) = parseBody {position=0;content=(explode s)}
         res

@@ -24,12 +24,6 @@ type Directory =
     | None
     | Directory of string*Directory list*string list
 
-type DaemonConfig = {
-    filename:string
-    arguments:string
-    directory:string
-}
-
 type Command =
     | SaveFile
     | OpenFile of string
@@ -44,7 +38,8 @@ type Command =
     | ExpandFolder of Directory
     | ShellCommandUpdating of String
     | ShellCommandConfirmed of string
-    | ShellStartDaemon of DaemonConfig
+    | ShellStartDaemon of string
+    | Close
 
 
 type TabState = {
@@ -158,10 +153,6 @@ let intialState = {
 //let myRunSpace = RunspaceFactory.CreateRunspace(myHost);
 //myRunSpace.Open();
 
-type ProcessStyle =
-    | Command of string
-    | Daemon of DaemonConfig
-
 let rec killProcessAndChildren (pid:int) =
     let searcher = new ManagementObjectSearcher("Select * From Win32_Process Where ParentProcessID=" + (pid.ToString()))
     let moc = searcher.Get();
@@ -174,7 +165,7 @@ let rec killProcessAndChildren (pid:int) =
 let run = 
     Task.Run 
         (fun () ->
-                let runProcess (s:ProcessStyle option) = 
+                let runProcess (s:string option) = 
                     let pi = 
                         ProcessStartInfo 
                             (
@@ -187,12 +178,6 @@ let run =
                             StandardOutputEncoding = Encoding.UTF8,
                             StandardErrorEncoding = Encoding.UTF8,
                             CreateNoWindow = true )
-                    match s with
-                        | Some (Daemon {filename=filename;arguments=arguments;directory=directory}) ->
-                            pi.FileName <- filename
-                            pi.Arguments <- arguments
-                            pi.WorkingDirectory <- directory
-                        | _ -> ()
                         
                     let proc = new System.Diagnostics.Process()
                     proc.StartInfo <- pi
@@ -204,7 +189,7 @@ let run =
                     let s2 = proc.ErrorDataReceived |> Observable.subscribe(fun e -> messages.OnNext <| CommandOutput e.Data |> ignore)
 
                     match s with 
-                        | Some(Command s) -> proc.StandardInput.WriteLineAsync(s) |> ignore
+                        | Some(s) -> proc.StandardInput.WriteLineAsync(s) |> ignore
                         | _ -> ()
                     
                     (proc,s1,s2)    
@@ -217,7 +202,13 @@ let run =
                                 p.Close()
                                 s1.Dispose()
                                 s2.Dispose()
-                                runProcess (Some (Daemon s))
+                                runProcess (Some (s))
+                            | Close ->
+                                killProcessAndChildren p.Id
+                                p.Close()
+                                s1.Dispose()
+                                s2.Dispose()
+                                (p,s1,s2)
                             | ShellCommandConfirmed s -> 
                                 p.StandardInput.WriteLineAsync(s) |> ignore
                                 (p,s1,s2)
@@ -259,6 +250,8 @@ let rec expandFolder (owner:Directory) (target:Directory) =
 
 let renderApp (w:Window) =
     
+    w.Closed |> Observable.subscribe(fun e -> messages.OnNext(Close) ) |> ignore
+
     let addSyntax (f:string) name ext = 
         use reader = new XmlTextReader(f)
         let customHighlighting = ICSharpCode.AvalonEdit.Highlighting.Xshd.HighlightingLoader.Load(reader, HighlightingManager.Instance);
@@ -310,7 +303,7 @@ let renderApp (w:Window) =
                     //for cmd in state.watches do 
                     //    let cwd s = "cd " +  IO.Path.GetDirectoryName tstate.doc.FileName + ";" + s
                     //    cmd.Replace("%currentpath%", tstate.doc.FileName) |> cwd |> run |> ignore
-                    messages.OnNext(ShellStartDaemon {filename="runhaskell";arguments="server.hs";directory="C:\perso\like"}) |> ignore
+                    messages.OnNext(ShellStartDaemon "cd C:\perso\like && runhaskell server.hs") |> ignore
                     //messages.OnNext(ShellCommandConfirmed "cd C:\perso\like && elm-make.exe main.elm --yes") |> ignore
 
                     {state with openFiles= List.map(fun tstate' -> if tstate.doc = tstate'.doc then {tstate' with path = unstarize tstate'.path} else tstate') state.openFiles }      

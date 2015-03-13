@@ -152,13 +152,6 @@ let intialState = {
 let run = 
     Task.Run 
         (fun () ->
-//            use powershell = PowerShell.Create();
-//            powershell.Runspace <- myRunSpace;
-//            powershell.AddScript(script) |> ignore
-//            powershell.AddCommand("out-default") |> ignore
-//            powershell.Commands.Commands.[0].MergeMyResults(PipelineResultTypes.Error, PipelineResultTypes.Output);
-//            powershell.Invoke()
-
                 let pi = 
                     ProcessStartInfo 
                         (
@@ -183,7 +176,12 @@ let run =
 
                 messages.Subscribe(fun msg ->
                     match msg with
-                    | ShellCommandConfirmed s -> proc.StandardInput.WriteLineAsync(s) |> ignore
+                    | ShellCommandConfirmed s -> 
+                        proc.StandardInput.WriteLineAsync(s) |> ignore
+                    | ShellCommandRestart s -> 
+                        proc.StandardInput.Close()
+                        runProcess s
+                        proc.StandardInput.WriteLineAsync(s) |> ignore
                     | _ -> () )
                 )
             
@@ -222,6 +220,7 @@ let renderApp (w:Window) =
         HighlightingManager.Instance.RegisterHighlighting(name, ext |> List.toArray, customHighlighting);
 
     addSyntax @"Elm-Mode.xshd" "Elm"  [".elm"]
+    addSyntax @"Haskell-Mode.xshd" "Haskell"  [".hs"]
     addSyntax @"Html-Mode.xshd" "Html"  [".html";"*.htm"]
     addSyntax @"Console-Mode.xshd" "Html"  [".console"]
 
@@ -266,7 +265,8 @@ let renderApp (w:Window) =
                     //for cmd in state.watches do 
                     //    let cwd s = "cd " +  IO.Path.GetDirectoryName tstate.doc.FileName + ";" + s
                     //    cmd.Replace("%currentpath%", tstate.doc.FileName) |> cwd |> run |> ignore
-                    messages.OnNext(ShellCommandConfirmed "cd C:\perso\like && elm-make.exe main.elm --yes") |> ignore
+                    messages.OnNext(ShellCommandConfirmed "cd C:\perso\like && runhaskell server.hs") |> ignore
+                    //messages.OnNext(ShellCommandConfirmed "cd C:\perso\like && elm-make.exe main.elm --yes") |> ignore
 
                     {state with openFiles= List.map(fun tstate' -> if tstate.doc = tstate'.doc then {tstate' with path = unstarize tstate'.path} else tstate') state.openFiles }      
                 | CommandOutput s ->

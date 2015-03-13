@@ -1,0 +1,82 @@
+﻿<!--http://avalonedit.net/documentation/-->
+<!--https://github.com/jonschlinkert/sublime-monokai-extended/blob/master/Monokai%20Extended%20Bright.JSON-tmTheme-->
+<!--https://github.com/elm-lang/elm-lang.org/blob/master/resources/codemirror-3.x/mode/elm/elm.js-->
+<!--https://github.com/icsharpcode/SharpDevelop/blob/master/src/Libraries/AvalonEdit/ICSharpCode.AvalonEdit/Highlighting/Resources/CSharp-Mode.xshd-->
+
+<SyntaxDefinition name="Haskell" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008" extensions = ".hs" >
+
+  <Color name="Comment" foreground="#75715E" />
+  <Color name="String" foreground="#E6DB74" />
+  <Color name="Keywords" foreground="#F92672" />
+  <Color name="Digits" foreground="#AE81FF" />
+  <Color name="Class" foreground="#A6E22E" />
+
+  <!-- This is the main ruleset. -->
+  <RuleSet>
+    <Span color="Comment" begin="--" />
+    <Span color="Comment" multiline="true" begin="/\*" end="\*/" />
+
+    <Span color="String">
+      <Begin>"</Begin>
+      <End>"</End>
+      <RuleSet>
+        <!-- nested span for escape sequences -->
+        <Span begin="\\" end="." />
+      </RuleSet>
+    </Span>
+
+    <Keywords fontWeight="bold" color="Keywords">
+      <Word>as</Word>
+      <Word>case</Word>
+      <Word>class</Word>
+      <Word>data</Word>
+      <Word>default</Word>
+      <Word>deriving</Word>
+      <Word>do</Word>
+      <Word>else</Word>
+      <Word>export</Word>
+      <Word>foreign</Word>
+      <Word>hiding</Word>
+      <Word>jsevent</Word>
+      <Word>if</Word>
+      <Word>import</Word>
+      <Word>in</Word>
+      <Word>infix</Word>
+      <Word>infixl</Word>
+      <Word>infixr</Word>
+      <Word>instance</Word>
+      <Word>let</Word>
+      <Word>module</Word>
+      <Word>newtype</Word>
+      <Word>of</Word>
+      <Word>open</Word>
+      <Word>then</Word>
+      <Word>type</Word>
+      <Word>where</Word>
+      <Word>_</Word>
+      <Word>-</Word>
+      <Word>..</Word>
+      <Word>|</Word>
+      <Word>:</Word>
+      <Word>=</Word>
+      <Word>\\</Word>
+      <Word>\</Word>
+      <Word>&lt;</Word>
+      <Word>&gt;</Word>
+      <Word>port</Word>
+    </Keywords>
+
+    <!-- Digits -->
+    <Rule color="Digits">
+      \b0[xX][0-9a-fA-F]+  # hex number
+      |    \b
+      (    \d+(\.[0-9]+)?   #number with optional floating point
+      |    \.[0-9]+         #or just starting with floating point
+      )
+      ([eE][+-]?[0-9]+)? # optional exponent
+    </Rule>
+
+    <Rule color="Class">(?&lt;!\w)[A-Z]\w+</Rule>
+    
+  </RuleSet>
+</SyntaxDefinition>

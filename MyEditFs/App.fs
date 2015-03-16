@@ -303,7 +303,7 @@ let renderApp (w:Window) =
                     //for cmd in state.watches do 
                     //    let cwd s = "cd " +  IO.Path.GetDirectoryName tstate.doc.FileName + ";" + s
                     //    cmd.Replace("%currentpath%", tstate.doc.FileName) |> cwd |> run |> ignore
-                    messages.OnNext(ShellStartDaemon "cd C:\perso\like && runhaskell server.hs") |> ignore
+                    messages.OnNext(ShellStartDaemon "cd C:\perso\like && elm-make.exe main.elm --yes && runhaskell server.hs") |> ignore
                     //messages.OnNext(ShellCommandConfirmed "cd C:\perso\like && elm-make.exe main.elm --yes") |> ignore
 
                     {state with openFiles= List.map(fun tstate' -> if tstate.doc = tstate'.doc then {tstate' with path = unstarize tstate'.path} else tstate') state.openFiles }      

@@ -50,6 +50,7 @@
       <Word>newtype</Word>
       <Word>of</Word>
       <Word>open</Word>
+      <Word>return</Word>
       <Word>then</Word>
       <Word>type</Word>
       <Word>where</Word>
